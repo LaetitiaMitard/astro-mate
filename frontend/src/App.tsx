@@ -1,14 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import "./App.css";
 import { getDashboard, type Dashboard } from "./dashboardApi";
 
-const statusLabels: Record<string, string> = {
+const statusLabels: Record<Dashboard["stationStatus"], string> = {
   NOMINAL: "NOMINAL",
   WARNING: "AVERTISSEMENT",
   CRITICAL: "CRITIQUE",
   OFFLINE: "HORS LIGNE",
   UNKNOWN: "INCONNU",
 };
+
+const systems = [
+  {
+    id: "life-support",
+    name: "Support de vie",
+    description: "Atmosphère et qualité de l’air",
+  },
+  {
+    id: "thermal-control",
+    name: "Contrôle thermique",
+    description: "Température et circulation thermique",
+  },
+  {
+    id: "power-supply",
+    name: "Alimentation électrique",
+    description: "Énergie disponible à bord",
+  },
+  {
+    id: "communications",
+    name: "Communications",
+    description: "Système de communication de la station",
+  },
+] as const;
+
+const systemStatusPriority = {
+  NOMINAL: 0,
+  UNKNOWN: 1,
+  OFFLINE: 2,
+  WARNING: 3,
+  CRITICAL: 4,
+} satisfies Record<Dashboard["stationStatus"], number>;
 
 function formatValue(value: number | null) {
   if (value === null) {
@@ -43,11 +74,68 @@ function formatRange(
   return `${min}–${max} ${unit}`;
 }
 
+function formatMeasurementDate(value: string | null) {
+  if (value === null || !Number.isFinite(Date.parse(value))) {
+    return "Aucune mesure valide";
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getSystemStatus(
+  systemId: string,
+  dashboard: Dashboard,
+): Dashboard["stationStatus"] {
+  const statuses: Dashboard["stationStatus"][] = dashboard.indicators
+    .filter((indicator) => indicator.systemId === systemId)
+    .map((indicator) => indicator.status);
+
+  if (dashboard.offlineSystems.includes(systemId)) {
+    statuses.push("OFFLINE");
+  }
+
+  if (statuses.length === 0) {
+    return "NOMINAL";
+  }
+
+  return statuses.reduce((mostSevere, status) =>
+    systemStatusPriority[status] > systemStatusPriority[mostSevere]
+      ? status
+      : mostSevere,
+  );
+}
+
+function getLastValidMeasurementAt(systemId: string, dashboard: Dashboard) {
+  return dashboard.indicators
+    .filter(
+      (indicator) =>
+        indicator.systemId === systemId &&
+        indicator.value !== null &&
+        indicator.measuredAt !== null &&
+        Number.isFinite(Date.parse(indicator.measuredAt)),
+    )
+    .reduce<string | null>((latest, indicator) => {
+      const measuredAt = indicator.measuredAt;
+      if (
+        measuredAt !== null &&
+        (latest === null || Date.parse(measuredAt) > Date.parse(latest))
+      ) {
+        return measuredAt;
+      }
+
+      return latest;
+    }, null);
+}
+
 export default function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "loaded" | "error">(
     "loading",
   );
+  const [pathname, setPathname] = useState(window.location.pathname);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -66,6 +154,40 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    const onPopState = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  function navigate(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    const nextPath = event.currentTarget.pathname;
+    window.history.pushState(null, "", nextPath);
+    setPathname(nextPath);
+  }
+
+  const selectedSystemId = pathname.match(/^\/systems\/([^/]+)\/?$/)?.[1];
+  const selectedSystem = systems.find(
+    (system) => system.id === selectedSystemId,
+  );
+  const isSystemListRoute = pathname === "/systems";
+  const isSystemRoute = isSystemListRoute || selectedSystemId !== undefined;
+  const selectedSystemIndicators =
+    selectedSystem && dashboard
+      ? dashboard.indicators.filter(
+          (indicator) => indicator.systemId === selectedSystem.id,
+        )
+      : [];
+  const selectedSystemStatus: Dashboard["stationStatus"] =
+    selectedSystem && dashboard
+      ? getSystemStatus(selectedSystem.id, dashboard)
+      : "UNKNOWN";
+  const selectedSystemMeasurementAt =
+    selectedSystem && dashboard
+      ? getLastValidMeasurementAt(selectedSystem.id, dashboard)
+      : null;
+
   return (
     <main className="app">
       <header className="page-header">
@@ -75,6 +197,14 @@ export default function App() {
         </div>
         <p className="notice">Simulation — données fictives, non opérationnelles</p>
       </header>
+      <nav className="main-navigation" aria-label="Navigation principale">
+        <a href="/" onClick={navigate}>
+          Tableau de bord
+        </a>
+        <a href="/systems" onClick={navigate}>
+          Systèmes
+        </a>
+      </nav>
 
       {loadState === "loading" && (
         <p className="loading" role="status">
@@ -94,7 +224,115 @@ export default function App() {
       )}
 
       {loadState === "loaded" && dashboard && (
-        <>
+        isSystemRoute ? (
+          selectedSystem ? (
+            <section
+              className="system-detail"
+              aria-labelledby="system-detail-heading"
+            >
+              <a className="back-link" href="/systems" onClick={navigate}>
+                Retour aux systèmes
+              </a>
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">SYSTÈME DE LA STATION</p>
+                  <h2 id="system-detail-heading">{selectedSystem.name}</h2>
+                  <p className="system-description">
+                    {selectedSystem.description}
+                  </p>
+                </div>
+                <span
+                  className={`system-status status status-${selectedSystemStatus.toLowerCase()}`}
+                >
+                  {statusLabels[selectedSystemStatus]}
+                </span>
+              </div>
+              <div className="system-measurement">
+                <span>Dernière mesure valide</span>
+                <strong>
+                  {formatMeasurementDate(selectedSystemMeasurementAt)}
+                </strong>
+              </div>
+              <section className="system-metrics" aria-label="Mesures du système">
+                <h3>Mesures suivies</h3>
+                {selectedSystemIndicators.length === 0 ? (
+                  <p>Aucune mesure associée à ce système.</p>
+                ) : (
+                  <ul className="system-metric-list">
+                    {selectedSystemIndicators.map((indicator) => (
+                      <li key={indicator.key}>
+                        <span>{indicator.name}</span>
+                        <strong>
+                          {formatValue(indicator.value)} {indicator.unit}
+                        </strong>
+                        <span
+                          className={`metric-status status-${indicator.status.toLowerCase()}`}
+                        >
+                          {statusLabels[indicator.status]}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </section>
+          ) : (
+            isSystemListRoute ? (
+              <section
+                className="systems-section"
+                aria-label="Systèmes de la station"
+              >
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">SURVEILLANCE DE LA STATION</p>
+                    <h2>Systèmes</h2>
+                  </div>
+                  <span className="section-count">04 SYSTÈMES</span>
+                </div>
+                <ul className="system-grid">
+                  {systems.map((system) => {
+                    const status = getSystemStatus(system.id, dashboard);
+                    return (
+                      <li key={system.id}>
+                        <a
+                          className="system-card"
+                          href={`/systems/${system.id}`}
+                          onClick={navigate}
+                        >
+                          <span className="system-card-heading">
+                            <strong>{system.name}</strong>
+                            <span
+                              className={`metric-status status-${status.toLowerCase()}`}
+                            >
+                              {statusLabels[status]}
+                            </span>
+                          </span>
+                          <span className="system-card-description">
+                            {system.description}
+                          </span>
+                          <span className="system-card-measurement">
+                            Dernière mesure valide :{" "}
+                            {formatMeasurementDate(
+                              getLastValidMeasurementAt(system.id, dashboard),
+                            )}
+                          </span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : (
+              <section className="error-panel" role="alert">
+                <h2>Système introuvable</h2>
+                <a href="/systems" onClick={navigate}>
+                  Retour aux systèmes
+                </a>
+              </section>
+            )
+          )
+        ) : (
+          <>
           <section className="station-summary" aria-label="État de la station">
             <div>
               <p className="eyebrow">ÉTAT GLOBAL</p>
@@ -171,7 +409,8 @@ export default function App() {
               {dashboard.recentOpenAlerts.length.toString().padStart(2, "0")}
             </span>
           </section>
-        </>
+          </>
+        )
       )}
     </main>
   );

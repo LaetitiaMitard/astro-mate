@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import App from "./App";
 
 const dashboard = {
@@ -115,5 +115,88 @@ describe("AstroMate dashboard", () => {
     );
     expect(screen.queryByText("21")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "O₂" })).not.toBeInTheDocument();
+  });
+
+  it("lists the canonical systems and opens their details", async () => {
+    const systemsDashboard = {
+      ...dashboard,
+      indicators: dashboard.indicators.map((indicator) =>
+        indicator.key === "temperature"
+          ? { ...indicator, status: "WARNING", measuredAt: "2026-10-20T11:45:00Z" }
+          : indicator,
+      ),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(systemsDashboard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("link", { name: "Systèmes" }));
+
+    const systemsSection = await screen.findByRole("region", {
+      name: "Systèmes de la station",
+    });
+    const lifeSupport = within(systemsSection).getByRole("link", {
+      name: /Support de vie/,
+    });
+    expect(lifeSupport).toBeInTheDocument();
+    expect(
+      within(systemsSection).getByRole("link", { name: /Contrôle thermique/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(systemsSection).getByRole("link", {
+        name: /Alimentation électrique/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(systemsSection).getByRole("link", { name: /Communications/ }),
+    ).toBeInTheDocument();
+    const communications = within(systemsSection).getByRole("link", {
+      name: /Communications/,
+    });
+    expect(within(communications).getByText("NOMINAL")).toBeInTheDocument();
+    expect(
+      within(communications).getByText(/Aucune mesure valide/),
+    ).toBeInTheDocument();
+
+    const thermalSystem = within(systemsSection).getByRole("link", {
+      name: /Contrôle thermique/,
+    });
+    expect(within(thermalSystem).getByText("AVERTISSEMENT")).toBeInTheDocument();
+    expect(within(thermalSystem).getByText(/20\/10\/2026/)).toBeInTheDocument();
+
+    fireEvent.click(thermalSystem);
+
+    expect(
+      await screen.findByRole("heading", { name: "Contrôle thermique" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Retour aux systèmes" })).toHaveAttribute(
+      "href",
+      "/systems",
+    );
+    expect(screen.getByText("22,3 °C")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("link", { name: "Retour aux systèmes" }));
+    await screen.findByRole("heading", { name: "Systèmes" });
+    for (const systemName of [
+      "Support de vie",
+      "Alimentation électrique",
+      "Communications",
+    ]) {
+      fireEvent.click(
+        screen.getByRole("link", { name: new RegExp(systemName) }),
+      );
+      expect(
+        await screen.findByRole("heading", { name: systemName }),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("link", { name: "Retour aux systèmes" }));
+      await screen.findByRole("heading", { name: "Systèmes" });
+    }
   });
 });

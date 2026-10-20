@@ -71,11 +71,15 @@ Terminal 2 — backend Spring Boot avec SQLite locale :
 
 ```sh
 cd backend
-./mvnw compile spring-boot:run
+./mvnw -Dexec.skip=true compile spring-boot:run
 ```
 
 La base est créée dans `backend/astromate.db`. Le backend est disponible sur
 <http://127.0.0.1:8080>.
+
+En développement, `-Dexec.skip=true` évite de réinstaller et reconstruire le
+frontend pendant que Vite fonctionne. Vite choisit un autre port si `5173` est
+occupé : ouvrir l’adresse indiquée dans son terminal.
 
 ## Build, tests et exécution empaquetée
 

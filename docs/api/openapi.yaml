@@ -439,7 +439,7 @@ components:
           type: [string, 'null']
     Component:
       type: object
-      required: [id, name, status, value, unit, updatedAt]
+      required: [id, name, status, value, unit, updatedAt, simulated]
       properties:
         id:
           type: string
@@ -454,6 +454,9 @@ components:
         updatedAt:
           type: [string, 'null']
           format: date-time
+        simulated:
+          type: boolean
+          description: Vrai lorsque l’état est simulé faute de métrique associée.
     MeasurementSeries:
       type: object
       required: [indicatorKey, sourceMetricIds, name, unit, from, to, measurements]

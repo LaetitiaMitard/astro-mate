@@ -62,6 +62,137 @@ const dashboard = {
   recentOpenAlerts: [],
 };
 
+const thermalSystemDetail = {
+  id: "thermal-control",
+  name: "Contrôle thermique",
+  description: "Température et circulation thermique",
+  status: "CRITICAL",
+  availability: "ONLINE",
+  updatedAt: "2026-10-20T12:05:00Z",
+  indicators: [],
+  metrics: [
+    {
+      id: "radiator-a-temperature",
+      name: "Température Radiateur A",
+      value: 31,
+      unit: "°C",
+      status: "CRITICAL",
+      nominalRange: {
+        min: 18,
+        max: 26,
+        minInclusive: true,
+        maxInclusive: true,
+      },
+      criticalLimits: { minExclusive: 15, maxExclusive: 30 },
+      measuredAt: "2026-10-20T12:05:00Z",
+      componentId: "radiator-a",
+    },
+    {
+      id: "radiator-b-temperature",
+      name: "Température Radiateur B",
+      value: 22.4,
+      unit: "°C",
+      status: "NOMINAL",
+      nominalRange: {
+        min: 18,
+        max: 26,
+        minInclusive: true,
+        maxInclusive: true,
+      },
+      criticalLimits: { minExclusive: 15, maxExclusive: 30 },
+      measuredAt: "2026-10-20T12:05:00Z",
+      componentId: "radiator-b",
+    },
+    {
+      id: "fluid-flow",
+      name: "Débit de fluide",
+      value: 120,
+      unit: "L/min",
+      status: "NOMINAL",
+      nominalRange: {
+        min: 80,
+        max: 200,
+        minInclusive: true,
+        maxInclusive: true,
+      },
+      criticalLimits: { minExclusive: null, maxExclusive: null },
+      measuredAt: "2026-10-20T12:05:00Z",
+      componentId: null,
+    },
+    {
+      id: "pressure",
+      name: "Pression",
+      value: 2.1,
+      unit: "bar",
+      status: "NOMINAL",
+      nominalRange: {
+        min: 1.5,
+        max: 3,
+        minInclusive: true,
+        maxInclusive: true,
+      },
+      criticalLimits: { minExclusive: null, maxExclusive: null },
+      measuredAt: "2026-10-20T12:05:00Z",
+      componentId: null,
+    },
+    {
+      id: "thermal-consumption",
+      name: "Consommation thermique",
+      value: 1.2,
+      unit: "kW",
+      status: "NOMINAL",
+      nominalRange: {
+        min: null,
+        max: 2,
+        minInclusive: true,
+        maxInclusive: false,
+      },
+      criticalLimits: { minExclusive: null, maxExclusive: null },
+      measuredAt: "2026-10-20T12:05:00Z",
+      componentId: null,
+    },
+  ],
+  components: [
+    {
+      id: "radiator-a",
+      name: "Radiateur A",
+      status: "CRITICAL",
+      value: 31,
+      unit: "°C",
+      updatedAt: "2026-10-20T12:05:00Z",
+      simulated: false,
+    },
+    {
+      id: "radiator-b",
+      name: "Radiateur B",
+      status: "NOMINAL",
+      value: 22.4,
+      unit: "°C",
+      updatedAt: "2026-10-20T12:05:00Z",
+      simulated: false,
+    },
+    {
+      id: "main-pump",
+      name: "Pompe principale",
+      status: "NOMINAL",
+      value: null,
+      unit: null,
+      updatedAt: null,
+      simulated: true,
+    },
+    {
+      id: "heat-exchanger",
+      name: "Échangeur thermique",
+      status: "NOMINAL",
+      value: null,
+      unit: null,
+      updatedAt: null,
+      simulated: true,
+    },
+  ],
+  recentEvents: [],
+};
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -197,12 +328,18 @@ describe("AstroMate dashboard", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(systemsDashboard), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      ),
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        const payload = url.includes("/systems/thermal-control")
+          ? thermalSystemDetail
+          : systemsDashboard;
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
     );
 
     render(<App />);
@@ -249,7 +386,7 @@ describe("AstroMate dashboard", () => {
       "href",
       "/systems",
     );
-    expect(screen.getByText("22,3 °C")).toBeInTheDocument();
+    expect(screen.getByText("31", { exact: true })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("link", { name: "Retour aux systèmes" }));
     await screen.findByRole("heading", { name: "Systèmes" });
@@ -267,5 +404,63 @@ describe("AstroMate dashboard", () => {
       fireEvent.click(screen.getByRole("link", { name: "Retour aux systèmes" }));
       await screen.findByRole("heading", { name: "Systèmes" });
     }
+  });
+
+  it("shows thermal references and components with distinct tabs and disabled maintenance", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        const payload = url.includes("/systems/thermal-control")
+          ? thermalSystemDetail
+          : dashboard;
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("link", { name: "Systèmes" }));
+    const systemsSection = await screen.findByRole("region", {
+      name: "Systèmes de la station",
+    });
+    fireEvent.click(
+      within(systemsSection).getByRole("link", { name: /Contrôle thermique/ }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Contrôle thermique" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Composants" }));
+
+    expect(screen.getByText("Radiateur A")).toBeInTheDocument();
+    expect(screen.getByText("Radiateur B")).toBeInTheDocument();
+    expect(screen.getByText("Pompe principale")).toBeInTheDocument();
+    expect(screen.getByText("Échangeur thermique")).toBeInTheDocument();
+    expect(screen.getByText("31 °C")).toBeInTheDocument();
+    expect(screen.getAllByText("CRITIQUE")).toHaveLength(2);
+    expect(screen.getAllByText("État simulé")).toHaveLength(2);
+    expect(screen.getAllByText(/20\/10\/2026/)).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Vue d’ensemble" }));
+    expect(screen.getAllByText("18–26 °C")).toHaveLength(2);
+    expect(screen.getAllByText(/<15 °C.*>30 °C/)).toHaveLength(2);
+    expect(screen.getByText("80–200 L/min")).toBeInTheDocument();
+    expect(screen.getByText("1,5–3 bar")).toBeInTheDocument();
+    expect(screen.getByText(/Jusqu’à <2 kW/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Historique" }));
+    expect(screen.getByRole("heading", { name: "Historique thermique" }))
+      .toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Maintenance" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Planifier une intervention" }),
+    ).not.toBeInTheDocument();
   });
 });

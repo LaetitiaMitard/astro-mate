@@ -199,6 +199,42 @@ class AstroMateApplicationTest {
         assertThat(criticalTemperature.path("status").asText()).isEqualTo("CRITICAL");
     }
 
+    @Test
+    void servesThermalMetricsAndComponentStatesFromTheirCurrentMeasurements() {
+        recordMeasurement("radiatorATemperature", 31);
+
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+        "/api/v1/systems/thermal-control",
+        JsonNode.class
+        );
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode detail = response.getBody();
+        assertThat(detail).isNotNull();
+        assertThat(detail.path("status").asText()).isEqualTo("CRITICAL");
+        JsonNode radiatorA = findById(detail.path("components"), "radiator-a");
+        assertThat(radiatorA.path("status").asText()).isEqualTo("CRITICAL");
+        assertThat(radiatorA.path("value").asDouble()).isEqualTo(31);
+        assertThat(radiatorA.path("simulated").asBoolean()).isFalse();
+
+        JsonNode pump = findById(detail.path("components"), "main-pump");
+        assertThat(pump.path("status").asText()).isEqualTo("NOMINAL");
+        assertThat(pump.path("value").isNull()).isTrue();
+        assertThat(pump.path("simulated").asBoolean()).isTrue();
+
+        JsonNode radiatorMetric = findById(
+        detail.path("metrics"),
+        "radiator-a-temperature"
+        );
+        assertThat(radiatorMetric.path("status").asText()).isEqualTo("CRITICAL");
+        assertThat(radiatorMetric.path("criticalLimits")
+        .path("maxExclusive").asDouble()).isEqualTo(30);
+        assertThat(radiatorMetric.path("nominalRange")
+        .path("max").asDouble()).isEqualTo(26);
+        assertThat(detail.path("metrics")).hasSize(5);
+        assertThat(detail.path("components")).hasSize(4);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "1.999, NOMINAL",
@@ -328,6 +364,15 @@ class AstroMateApplicationTest {
             }
         }
         throw new AssertionError("Missing dashboard indicator: " + key);
+    }
+
+    private JsonNode findById(JsonNode items, String id) {
+        for (JsonNode item : items) {
+            if (item.path("id").asText().equals(id)) {
+                return item;
+            }
+        }
+        throw new AssertionError("Missing item: " + id);
     }
 
     private JsonNode getDashboard() {

@@ -18,6 +18,49 @@ export interface DashboardIndicator {
   measuredAt: string | null;
 }
 
+export interface SystemDetail {
+  id: string;
+  name: string;
+  description: string;
+  status: SystemStatus;
+  availability: "ONLINE" | "OFFLINE";
+  updatedAt: string | null;
+  indicators: DashboardIndicator[];
+  metrics: {
+    id: string;
+    name: string;
+    unit: string;
+    value: number | null;
+    status: IndicatorStatus;
+    nominalRange: DashboardIndicator["nominalRange"];
+    criticalLimits: {
+      minExclusive: number | null;
+      maxExclusive: number | null;
+    };
+    measuredAt: string | null;
+    componentId: string | null;
+  }[];
+  components: {
+    id: string;
+    name: string;
+    status: IndicatorStatus;
+    value: number | null;
+    unit: string | null;
+    updatedAt: string | null;
+    simulated: boolean;
+  }[];
+  recentEvents: {
+    id: string;
+    level: string;
+    category: string;
+    systemId: string | null;
+    systemName: string | null;
+    source: string | null;
+    message: string;
+    occurredAt: string;
+  }[];
+}
+
 export interface Dashboard {
   stationStatus: SystemStatus;
   offlineSystems: string[];
@@ -114,6 +157,78 @@ function isSystemState(
   );
 }
 
+function isCriticalLimits(value: unknown): value is SystemDetail["metrics"][number]["criticalLimits"] {
+  return (
+    isRecord(value) &&
+    (typeof value.minExclusive === "number" || value.minExclusive === null) &&
+    (typeof value.maxExclusive === "number" || value.maxExclusive === null)
+  );
+}
+
+function isMetricDetail(value: unknown): value is SystemDetail["metrics"][number] {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.unit === "string" &&
+    (typeof value.value === "number" && Number.isFinite(value.value) ||
+      value.value === null) &&
+    isOneOf(value.status, indicatorStatuses) &&
+    isRange(value.nominalRange) &&
+    isCriticalLimits(value.criticalLimits) &&
+    (typeof value.measuredAt === "string" || value.measuredAt === null) &&
+    (typeof value.componentId === "string" || value.componentId === null)
+  );
+}
+
+function isComponent(value: unknown): value is SystemDetail["components"][number] {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    isOneOf(value.status, indicatorStatuses) &&
+    (typeof value.value === "number" && Number.isFinite(value.value) ||
+      value.value === null) &&
+    (typeof value.unit === "string" || value.unit === null) &&
+    (typeof value.updatedAt === "string" || value.updatedAt === null) &&
+    typeof value.simulated === "boolean"
+  );
+}
+
+function isEvent(value: unknown): value is SystemDetail["recentEvents"][number] {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.level === "string" &&
+    typeof value.category === "string" &&
+    (typeof value.systemId === "string" || value.systemId === null) &&
+    (typeof value.systemName === "string" || value.systemName === null) &&
+    (typeof value.source === "string" || value.source === null) &&
+    typeof value.message === "string" &&
+    typeof value.occurredAt === "string"
+  );
+}
+
+function isSystemDetail(value: unknown): value is SystemDetail {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.description === "string" &&
+    isOneOf(value.status, systemStatuses) &&
+    isOneOf(value.availability, ["ONLINE", "OFFLINE"]) &&
+    (typeof value.updatedAt === "string" || value.updatedAt === null) &&
+    Array.isArray(value.indicators) &&
+    value.indicators.every(isIndicator) &&
+    Array.isArray(value.metrics) &&
+    value.metrics.every(isMetricDetail) &&
+    Array.isArray(value.components) &&
+    value.components.every(isComponent) &&
+    Array.isArray(value.recentEvents) &&
+    value.recentEvents.every(isEvent)
+  );
+}
+
 function isDashboard(value: unknown): value is Dashboard {
   return (
     isRecord(value) &&
@@ -149,6 +264,27 @@ export async function getDashboard(signal: AbortSignal): Promise<Dashboard> {
   const payload: unknown = await response.json();
   if (!isDashboard(payload)) {
     throw new Error("Dashboard response is invalid");
+  }
+
+  return payload;
+}
+
+export async function getSystemDetail(
+  systemId: string,
+  signal: AbortSignal,
+): Promise<SystemDetail> {
+  const response = await fetch(
+    `/api/v1/systems/${encodeURIComponent(systemId)}`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error(`System detail request failed with status ${response.status}`);
+  }
+
+  const payload: unknown = await response.json();
+  if (!isSystemDetail(payload) || payload.id !== systemId) {
+    throw new Error("System detail response is invalid");
   }
 
   return payload;

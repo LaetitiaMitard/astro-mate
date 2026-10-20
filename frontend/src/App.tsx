@@ -1,6 +1,17 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import "./App.css";
-import { getDashboard, type Dashboard } from "./dashboardApi";
+import {
+  getDashboard,
+  getSystemDetail,
+  type Dashboard,
+  type SystemDetail,
+} from "./dashboardApi";
+import {
+  formatMeasurementDate,
+  formatRange,
+  formatValue,
+} from "./dashboardFormat";
+import ThermalSystemDetail from "./ThermalSystemDetail";
 
 const statusLabels: Record<Dashboard["stationStatus"], string> = {
   NOMINAL: "NOMINAL",
@@ -40,50 +51,6 @@ const systemStatusPriority = {
   WARNING: 3,
   CRITICAL: 4,
 } satisfies Record<Dashboard["stationStatus"], number>;
-
-function formatValue(value: number | null) {
-  if (value === null) {
-    return "Inconnue";
-  }
-
-  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(
-    value,
-  );
-}
-
-function formatRange(
-  range: Dashboard["indicators"][number]["nominalRange"],
-  unit: string,
-) {
-  const min =
-    range.min === null
-      ? null
-      : `${range.minInclusive ? "" : ">"}${formatValue(range.min)}`;
-  const max =
-    range.max === null
-      ? null
-      : `${range.maxInclusive ? "" : "<"}${formatValue(range.max)}`;
-
-  if (min === null) {
-    return `Jusqu’à ${max} ${unit}`;
-  }
-  if (max === null) {
-    return `À partir de ${min} ${unit}`;
-  }
-
-  return `${min}–${max} ${unit}`;
-}
-
-function formatMeasurementDate(value: string | null) {
-  if (value === null || !Number.isFinite(Date.parse(value))) {
-    return "Aucune mesure valide";
-  }
-
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 function getSystemStatus(
   systemId: string,
@@ -143,6 +110,14 @@ export default function App() {
     "loading",
   );
   const [pathname, setPathname] = useState(window.location.pathname);
+  const [systemDetail, setSystemDetail] = useState<SystemDetail | null>(null);
+  const [detailLoadState, setDetailLoadState] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
+  const selectedSystemId = pathname.match(/^\/systems\/([^/]+)\/?$/)?.[1];
+  const selectedSystem = systems.find(
+    (system) => system.id === selectedSystemId,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -162,6 +137,28 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (selectedSystemId !== "thermal-control") {
+      return;
+    }
+
+    const controller = new AbortController();
+    setDetailLoadState("loading");
+
+    getSystemDetail(selectedSystemId, controller.signal)
+      .then((result) => {
+        setSystemDetail(result);
+        setDetailLoadState("loaded");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setDetailLoadState("error");
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedSystemId]);
+
+  useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname);
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -174,10 +171,6 @@ export default function App() {
     setPathname(nextPath);
   }
 
-  const selectedSystemId = pathname.match(/^\/systems\/([^/]+)\/?$/)?.[1];
-  const selectedSystem = systems.find(
-    (system) => system.id === selectedSystemId,
-  );
   const isSystemListRoute = pathname === "/systems";
   const isSystemRoute = isSystemListRoute || selectedSystemId !== undefined;
   const selectedSystemIndicators =
@@ -233,6 +226,25 @@ export default function App() {
       {loadState === "loaded" && dashboard && (
         isSystemRoute ? (
           selectedSystem ? (
+            selectedSystem.id === "thermal-control" ? (
+              detailLoadState === "loading" ? (
+                <p className="loading" role="status">
+                  Lecture du contrôle thermique…
+                </p>
+              ) : detailLoadState === "error" || systemDetail === null ? (
+                <section className="error-panel" role="alert">
+                  <h2>Détail du système indisponible</h2>
+                  <p>
+                    Impossible de lire les métriques et composants thermiques.
+                  </p>
+                </section>
+              ) : (
+                <ThermalSystemDetail
+                  detail={systemDetail}
+                  onNavigate={navigate}
+                />
+              )
+            ) : (
             <section
               className="system-detail"
               aria-labelledby="system-detail-heading"
@@ -283,6 +295,7 @@ export default function App() {
                 )}
               </section>
             </section>
+            )
           ) : (
             isSystemListRoute ? (
               <section

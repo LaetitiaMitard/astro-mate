@@ -1,0 +1,571 @@
+openapi: 3.1.0
+info:
+  title: AstroMate API
+  version: 1.0.0
+  description: >-
+    API locale en lecture seule de la simulation AstroMate. Toutes les données
+    sont fictives et non opérationnelles. En livraison, cette version doit être
+    alignée sur la version de l'artefact Spring Boot.
+servers:
+  - url: http://127.0.0.1:8080/api/v1
+    description: API locale, liée à l'interface loopback
+tags:
+  - name: Dashboard
+  - name: Systems
+  - name: Measurements
+  - name: Alerts
+  - name: Events
+paths:
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboard
+      summary: Lire la synthèse de la station simulée
+      description: Retourne les quatre KPI, l'état dérivé et au plus quatre alertes ouvertes.
+      responses:
+        '200':
+          description: Synthèse courante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /systems:
+    get:
+      tags: [Systems]
+      operationId: listSystems
+      summary: Lister les systèmes
+      responses:
+        '200':
+          description: Systèmes canoniques de la station
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SystemSummary'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /systems/{systemId}:
+    get:
+      tags: [Systems]
+      operationId: getSystem
+      summary: Lire le détail d'un système
+      parameters:
+        - $ref: '#/components/parameters/SystemId'
+      responses:
+        '200':
+          description: Détail du système et de ses métriques
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /systems/{systemId}/indicators/{indicatorKey}/measurements:
+    get:
+      tags: [Measurements]
+      operationId: listIndicatorMeasurements
+      summary: Lire l'historique d'un indicateur système
+      description: >-
+        L'indicateur température du contrôle thermique est calculé comme la
+        moyenne des mesures des deux radiateurs, à chaque horodatage.
+        La période par défaut couvre les six dernières heures. La rétention
+        effective des mesures est limitée à cette fenêtre.
+      parameters:
+        - $ref: '#/components/parameters/SystemId'
+        - name: indicatorKey
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [oxygen, carbonDioxide, temperature, availableEnergy, fluidFlow, pressure, consumption]
+        - name: from
+          in: query
+          description: Début inclusif de la période, en UTC.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Fin exclusive de la période, en UTC.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Mesures horodatées de l'indicateur, agrégées si nécessaire
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeasurementSeries'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /alerts:
+    get:
+      tags: [Alerts]
+      operationId: listAlerts
+      summary: Rechercher les alertes
+      description: >-
+        Sans filtre de statut, retourne les alertes ouvertes et résolues.
+        L'ordre par défaut place les alertes ouvertes en premier, puis les
+        niveaux les plus élevés et les détections les plus récentes.
+      parameters:
+        - name: status
+          in: query
+          description: Filtrer sur l'état de l'alerte.
+          schema:
+            $ref: '#/components/schemas/AlertStatus'
+        - name: level
+          in: query
+          schema:
+            $ref: '#/components/schemas/AlertLevel'
+        - name: systemId
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page d'alertes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /events:
+    get:
+      tags: [Events]
+      operationId: searchEvents
+      summary: Rechercher les événements techniques
+      description: >-
+        La période par défaut est constituée des sept derniers jours. La
+        recherche libre porte sur le message, la source et le nom du système.
+        La taille de page par défaut est 20; l'export n'est pas disponible.
+      parameters:
+        - name: from
+          in: query
+          description: Début inclusif de la période, en UTC.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Fin exclusive de la période, en UTC.
+          schema:
+            type: string
+            format: date-time
+        - name: level
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventLevel'
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventCategory'
+        - name: q
+          in: query
+          description: Recherche insensible à la casse dans le message, la source et le nom du système.
+          schema:
+            type: string
+            maxLength: 200
+        - name: sort
+          in: query
+          description: Champ et ordre de tri.
+          schema:
+            type: string
+            enum: ['occurredAt,desc', 'occurredAt,asc']
+            default: occurredAt,desc
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page d'événements techniques
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  parameters:
+    SystemId:
+      name: systemId
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      description: Index de page à base zéro.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: Paramètre invalide ou période incorrecte
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Identifiant de système ou d'indicateur inconnu
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: Simulation ou base locale indisponible
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: Erreur inattendue; aucun détail sensible n'est exposé
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    SystemStatus:
+      type: string
+      enum: [NOMINAL, WARNING, CRITICAL, OFFLINE, UNKNOWN]
+    MetricStatus:
+      type: string
+      enum: [NOMINAL, WARNING, CRITICAL, UNKNOWN]
+    Availability:
+      type: string
+      enum: [ONLINE, OFFLINE]
+    AlertLevel:
+      type: string
+      enum: [INFO, WARNING, CRITICAL]
+    AlertStatus:
+      type: string
+      enum: [OPEN, RESOLVED]
+    EventLevel:
+      type: string
+      enum: [INFO, WARNING, CRITICAL]
+    EventCategory:
+      type: string
+      enum: [SYSTEM, ALERT, MAINTENANCE, OPERATION, DATA]
+    SimulationStatus:
+      type: string
+      enum: [ACTIVE, PAUSED, UNAVAILABLE]
+    Range:
+      type: object
+      required: [min, max, minInclusive, maxInclusive]
+      properties:
+        min:
+          type: [number, 'null']
+        max:
+          type: [number, 'null']
+        minInclusive:
+          type: boolean
+          description: Indique si la borne basse appartient à la plage nominale.
+        maxInclusive:
+          type: boolean
+          description: Indique si la borne haute appartient à la plage nominale.
+    CriticalLimits:
+      type: object
+      required: [minExclusive, maxExclusive]
+      properties:
+        minExclusive:
+          type: [number, 'null']
+        maxExclusive:
+          type: [number, 'null']
+    Dashboard:
+      type: object
+      required: [stationStatus, offlineSystems, simulationStatus, lastMeasurementAt, indicators, recentOpenAlerts]
+      properties:
+        stationStatus:
+          $ref: '#/components/schemas/SystemStatus'
+        offlineSystems:
+          type: array
+          items:
+            type: string
+          description: Systèmes hors ligne, pour expliquer un état global OFFLINE.
+        simulationStatus:
+          $ref: '#/components/schemas/SimulationStatus'
+        lastMeasurementAt:
+          type: [string, 'null']
+          format: date-time
+        indicators:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/Indicator'
+        recentOpenAlerts:
+          type: array
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/Alert'
+    Indicator:
+      type: object
+      required: [key, systemId, sourceMetricIds, name, value, unit, status, nominalRange, measuredAt]
+      properties:
+        key:
+          type: string
+        systemId:
+          type: string
+        sourceMetricIds:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+        value:
+          type: [number, 'null']
+        unit:
+          type: string
+        status:
+          $ref: '#/components/schemas/MetricStatus'
+        nominalRange:
+          $ref: '#/components/schemas/Range'
+        measuredAt:
+          type: [string, 'null']
+          format: date-time
+    SystemSummary:
+      type: object
+      required: [id, name, description, status, availability, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/SystemStatus'
+        availability:
+          $ref: '#/components/schemas/Availability'
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+    SystemDetail:
+      allOf:
+        - $ref: '#/components/schemas/SystemSummary'
+        - type: object
+          required: [indicators, metrics, components, recentEvents]
+          properties:
+            indicators:
+              type: array
+              items:
+                $ref: '#/components/schemas/Indicator'
+            metrics:
+              type: array
+              items:
+                $ref: '#/components/schemas/MetricDetail'
+            components:
+              type: array
+              items:
+                $ref: '#/components/schemas/Component'
+            recentEvents:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+    MetricDetail:
+      type: object
+      required: [id, name, unit, value, status, nominalRange, criticalLimits, measuredAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        unit:
+          type: string
+        value:
+          type: [number, 'null']
+        status:
+          $ref: '#/components/schemas/MetricStatus'
+        nominalRange:
+          $ref: '#/components/schemas/Range'
+        criticalLimits:
+          $ref: '#/components/schemas/CriticalLimits'
+        measuredAt:
+          type: [string, 'null']
+          format: date-time
+        componentId:
+          type: [string, 'null']
+    Component:
+      type: object
+      required: [id, name, status, value, unit, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/MetricStatus'
+        value:
+          type: [number, 'null']
+        unit:
+          type: [string, 'null']
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+    MeasurementSeries:
+      type: object
+      required: [indicatorKey, sourceMetricIds, name, unit, from, to, measurements]
+      properties:
+        indicatorKey:
+          type: string
+        sourceMetricIds:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+        unit:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        measurements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Measurement'
+    Measurement:
+      type: object
+      required: [value, measuredAt]
+      properties:
+        value:
+          type: number
+        measuredAt:
+          type: string
+          format: date-time
+    Alert:
+      type: object
+      required: [id, level, systemId, systemName, message, status, detectedAt]
+      properties:
+        id:
+          type: string
+        level:
+          $ref: '#/components/schemas/AlertLevel'
+        systemId:
+          type: string
+        systemName:
+          type: string
+        metricId:
+          type: [string, 'null']
+        message:
+          type: string
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        detectedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: [string, 'null']
+          format: date-time
+    AlertPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Alert'
+    Event:
+      type: object
+      required: [id, level, category, message, occurredAt]
+      properties:
+        id:
+          type: string
+        level:
+          $ref: '#/components/schemas/EventLevel'
+        category:
+          $ref: '#/components/schemas/EventCategory'
+        systemId:
+          type: [string, 'null']
+        systemName:
+          type: [string, 'null']
+        source:
+          type: [string, 'null']
+        message:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+    EventPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+    PageMetadata:
+      type: object
+      required: [page, pageSize, totalElements, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 0
+        pageSize:
+          type: integer
+          minimum: 1
+        totalElements:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    Problem:
+      type: object
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference

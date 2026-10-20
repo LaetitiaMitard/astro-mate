@@ -1,0 +1,3 @@
+# Architecture locale et pile de démonstration
+
+AstroMate est une application de formation à une seule station fictive, qui doit persister son historique sans réseau ni équipement réel. Nous retenons React avec TypeScript et Vite pour l’interface, Java 21 avec Spring Boot 3 pour l’API locale, SQLite comme base locale et OpenAPI en contract-first; le frontend compilé est servi par Spring Boot en usage normal afin de ne lancer qu’un processus. Ce choix privilégie une démonstration locale reproductible et autonome plutôt qu’une base de données distante ou un déploiement distribué; TypeScript est un choix explicite propre à ce projet, et aucun design system n’est imposé.

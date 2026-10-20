@@ -5,6 +5,12 @@ import App from "./App";
 const dashboard = {
   stationStatus: "NOMINAL",
   offlineSystems: [],
+  systemStatuses: [
+    { systemId: "life-support", status: "NOMINAL" },
+    { systemId: "thermal-control", status: "NOMINAL" },
+    { systemId: "power-supply", status: "NOMINAL" },
+    { systemId: "communications", status: "NOMINAL" },
+  ],
   simulationStatus: "ACTIVE",
   lastMeasurementAt: "2026-10-20T12:00:00Z",
   indicators: [
@@ -97,6 +103,69 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByText("Aucune alerte ouverte")).toBeInTheDocument();
   });
 
+  it("makes the radiator average and its most severe status clear", async () => {
+    const criticalDashboard = {
+      ...dashboard,
+      stationStatus: "CRITICAL",
+      systemStatuses: dashboard.systemStatuses.map((system) =>
+        system.systemId === "thermal-control"
+          ? { ...system, status: "CRITICAL" }
+          : system,
+      ),
+      indicators: dashboard.indicators.map((indicator) =>
+        indicator.key === "temperature"
+          ? { ...indicator, value: 26.7, status: "CRITICAL" }
+          : indicator,
+      ),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(criticalDashboard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("region", { name: "État de la station" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("26,7")).toBeInTheDocument();
+    expect(screen.getAllByText("CRITIQUE")).toHaveLength(2);
+  });
+
+  it("names offline systems alongside the station status", async () => {
+    const offlineDashboard = {
+      ...dashboard,
+      stationStatus: "OFFLINE",
+      offlineSystems: ["thermal-control"],
+      systemStatuses: dashboard.systemStatuses.map((system) =>
+        system.systemId === "thermal-control"
+          ? { ...system, status: "OFFLINE" }
+          : system,
+      ),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(offlineDashboard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("HORS LIGNE")).toBeInTheDocument();
+    expect(
+      screen.getByText("Systèmes hors ligne : Contrôle thermique"),
+    ).toBeInTheDocument();
+  });
+
   it("does not display nominal values when the dashboard API is unavailable", async () => {
     vi.stubGlobal(
       "fetch",
@@ -120,10 +189,10 @@ describe("AstroMate dashboard", () => {
   it("lists the canonical systems and opens their details", async () => {
     const systemsDashboard = {
       ...dashboard,
-      indicators: dashboard.indicators.map((indicator) =>
-        indicator.key === "temperature"
-          ? { ...indicator, status: "WARNING", measuredAt: "2026-10-20T11:45:00Z" }
-          : indicator,
+      systemStatuses: dashboard.systemStatuses.map((system) =>
+        system.systemId === "thermal-control"
+          ? { ...system, status: "WARNING" }
+          : system,
       ),
     };
     vi.stubGlobal(

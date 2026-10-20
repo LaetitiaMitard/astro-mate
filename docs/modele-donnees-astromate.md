@@ -68,6 +68,8 @@ Représente un échantillon numérique valide d’une métrique.
 
 Les mesures invalides ne sont pas enregistrées comme mesures valides. Les mesures sont conservées sur une fenêtre glissante de six heures.
 
+Le backend initialise les dernières mesures canoniques dans `metric_measurement`. Cette initialisation idempotente reprend O₂, CO₂ et l’énergie depuis la table historique `dashboard_indicator`, et initialise séparément les mesures des deux radiateurs, le débit, la pression et la consommation. `dashboard_indicator` reste une projection de compatibilité; la température courante est calculée depuis les deux radiateurs et n’est pas lue comme une mesure indépendante.
+
 ### Alert
 
 Représente un épisode d’anomalie de métrique suivi de son ouverture à sa résolution.

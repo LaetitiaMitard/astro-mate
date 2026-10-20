@@ -5,11 +5,15 @@ import java.util.List;
 public record DashboardResponse(
         String stationStatus,
         List<String> offlineSystems,
+        List<SystemState> systemStatuses,
         String simulationStatus,
         String lastMeasurementAt,
         List<Indicator> indicators,
         List<Alert> recentOpenAlerts
 ) {
+    public record SystemState(String systemId, String status) {
+    }
+
     public record Indicator(
             String key,
             String systemId,

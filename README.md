@@ -18,8 +18,9 @@ indicateurs simulés, de repérer des anomalies et de consulter leur historique.
 - Consultation des alertes et recherche filtrée dans le journal d’événements.
 - Simulation locale périodique et persistance de l’historique.
 
-Le dépôt fournit le socle local de l’application. Les vues et règles métier
-décrites dans les spécifications restent à implémenter.
+Le socle local comprend le tableau de bord, la liste des systèmes et le calcul
+des états des métriques selon les seuils configurés. Les autres vues et
+capacités décrites dans les spécifications restent à implémenter.
 
 ## Architecture prévue
 
@@ -91,9 +92,10 @@ produit le JAR exécutable :
 ./mvnw verify
 ```
 
-Le test d’intégration démarre Spring Boot avec une base SQLite en mémoire et
-vérifie que le serveur écoute sur loopback et sert l’index compilé. Les tests
-frontend vérifient l’écran de démarrage minimal.
+Les tests d’intégration couvrent le calcul des seuils, l’agrégation des états,
+les domaines physiques et l’agrégation des températures des radiateurs. Le
+frontend vérifie aussi la présentation des états d’alerte et des systèmes hors
+ligne.
 
 Pour lancer l’application empaquetée avec le frontend servi par Spring Boot :
 

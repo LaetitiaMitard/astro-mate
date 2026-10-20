@@ -89,6 +89,13 @@ function getSystemStatus(
   systemId: string,
   dashboard: Dashboard,
 ): Dashboard["stationStatus"] {
+  const reportedStatus = dashboard.systemStatuses?.find(
+    (system) => system.systemId === systemId,
+  )?.status;
+  if (reportedStatus !== undefined) {
+    return reportedStatus;
+  }
+
   const statuses: Dashboard["stationStatus"][] = dashboard.indicators
     .filter((indicator) => indicator.systemId === systemId)
     .map((indicator) => indicator.status);
@@ -342,6 +349,18 @@ export default function App() {
                 {statusLabels[dashboard.stationStatus]}
               </strong>
             </div>
+            {dashboard.offlineSystems.length > 0 && (
+              <p className="offline-system-note">
+                Systèmes hors ligne :{" "}
+                {dashboard.offlineSystems
+                  .map(
+                    (systemId) =>
+                      systems.find((system) => system.id === systemId)?.name ??
+                      systemId,
+                  )
+                  .join(", ")}
+              </p>
+            )}
             <div className="simulation-status">
               <span
                 className={`status-dot simulation-dot-${dashboard.simulationStatus.toLowerCase()}`}

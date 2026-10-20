@@ -308,6 +308,14 @@ components:
           type: [number, 'null']
         maxExclusive:
           type: [number, 'null']
+    SystemState:
+      type: object
+      required: [systemId, status]
+      properties:
+        systemId:
+          type: string
+        status:
+          $ref: '#/components/schemas/SystemStatus'
     Dashboard:
       type: object
       required: [stationStatus, offlineSystems, simulationStatus, lastMeasurementAt, indicators, recentOpenAlerts]
@@ -319,6 +327,13 @@ components:
           items:
             type: string
           description: Systèmes hors ligne, pour expliquer un état global OFFLINE.
+        systemStatuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/SystemState'
+          description: >-
+            État dérivé de chaque système selon la priorité
+            CRITICAL > WARNING > OFFLINE > UNKNOWN > NOMINAL.
         simulationStatus:
           $ref: '#/components/schemas/SimulationStatus'
         lastMeasurementAt:

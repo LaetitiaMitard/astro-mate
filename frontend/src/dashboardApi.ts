@@ -21,6 +21,7 @@ export interface DashboardIndicator {
 export interface Dashboard {
   stationStatus: SystemStatus;
   offlineSystems: string[];
+  systemStatuses?: { systemId: string; status: SystemStatus }[];
   simulationStatus: "ACTIVE" | "PAUSED" | "UNAVAILABLE";
   lastMeasurementAt: string | null;
   indicators: DashboardIndicator[];
@@ -44,6 +45,12 @@ const indicatorKeys = new Set([
   "carbonDioxide",
   "temperature",
   "availableEnergy",
+]);
+const systemIds = new Set([
+  "life-support",
+  "thermal-control",
+  "power-supply",
+  "communications",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -96,12 +103,29 @@ function isAlert(value: unknown): value is Dashboard["recentOpenAlerts"][number]
   );
 }
 
+function isSystemState(
+  value: unknown,
+): value is NonNullable<Dashboard["systemStatuses"]>[number] {
+  return (
+    isRecord(value) &&
+    typeof value.systemId === "string" &&
+    systemIds.has(value.systemId) &&
+    isOneOf(value.status, systemStatuses)
+  );
+}
+
 function isDashboard(value: unknown): value is Dashboard {
   return (
     isRecord(value) &&
     isOneOf(value.stationStatus, systemStatuses) &&
     Array.isArray(value.offlineSystems) &&
     value.offlineSystems.every((system) => typeof system === "string") &&
+    (value.systemStatuses === undefined ||
+      (Array.isArray(value.systemStatuses) &&
+        value.systemStatuses.length === systemIds.size &&
+        value.systemStatuses.every(isSystemState) &&
+        new Set(value.systemStatuses.map((system) => system.systemId)).size ===
+          systemIds.size)) &&
     isOneOf(value.simulationStatus, ["ACTIVE", "PAUSED", "UNAVAILABLE"]) &&
     (typeof value.lastMeasurementAt === "string" ||
       value.lastMeasurementAt === null) &&

@@ -18,8 +18,8 @@ indicateurs simulés, de repérer des anomalies et de consulter leur historique.
 - Consultation des alertes et recherche filtrée dans le journal d’événements.
 - Simulation locale périodique et persistance de l’historique.
 
-L’application est en phase de spécification : le dépôt ne contient pas encore
-de code applicatif ni de procédure d’installation, de lancement ou de test.
+Le dépôt fournit le socle local de l’application. Les vues et règles métier
+décrites dans les spécifications restent à implémenter.
 
 ## Architecture prévue
 
@@ -43,7 +43,59 @@ contraintes sont décrits dans l’[ADR d’architecture](docs/adr/0001-architec
 - [Maquette du détail système](docs/maquette%20d%C3%A9tail%20systeme.png)
 - [Maquette du journal](docs/maquette%20journal.jpeg)
 
-## Démarrage et vérification
+## Prérequis
 
-Les commandes de démarrage et de validation seront documentées une fois le
-code applicatif et ses outils ajoutés au dépôt.
+- Java 21
+- Node.js 20 ou ultérieur et npm
+
+Les dépendances sont téléchargées lors du premier build. À l’exécution,
+l’application ne requiert aucun service distant : Spring Boot utilise une base
+SQLite locale et écoute uniquement sur `127.0.0.1`.
+
+## Développement
+
+Lancer le frontend et le backend dans deux terminaux, depuis la racine du
+dépôt.
+
+Terminal 1 — frontend Vite, avec proxy `/api` vers le backend :
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Ouvrir <http://127.0.0.1:5173>.
+
+Terminal 2 — backend Spring Boot avec SQLite locale :
+
+```sh
+cd backend
+./mvnw compile spring-boot:run
+```
+
+La base est créée dans `backend/astromate.db`. Le backend est disponible sur
+<http://127.0.0.1:8080>.
+
+## Build, tests et exécution empaquetée
+
+Depuis le répertoire `backend`, cette commande installe les dépendances
+frontend, construit les assets, exécute les tests frontend et backend, puis
+produit le JAR exécutable :
+
+```sh
+./mvnw verify
+```
+
+Le test d’intégration démarre Spring Boot avec une base SQLite en mémoire et
+vérifie que le serveur écoute sur loopback et sert l’index compilé. Les tests
+frontend vérifient l’écran de démarrage minimal.
+
+Pour lancer l’application empaquetée avec le frontend servi par Spring Boot :
+
+```sh
+java -jar target/astromate-0.1.0-SNAPSHOT.jar
+```
+
+Lancer cette commande depuis `backend`; l’interface sera disponible sur
+<http://127.0.0.1:8080>.

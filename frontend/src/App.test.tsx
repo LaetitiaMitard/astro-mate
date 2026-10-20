@@ -194,7 +194,7 @@ const thermalSystemDetail = {
       status: "NOMINAL",
       value: null,
       unit: null,
-      updatedAt: null,
+      updatedAt: "2026-10-20T12:00:00Z",
       simulated: true,
     },
     {
@@ -203,7 +203,7 @@ const thermalSystemDetail = {
       status: "NOMINAL",
       value: null,
       unit: null,
-      updatedAt: null,
+      updatedAt: "2026-10-20T12:00:00Z",
       simulated: true,
     },
   ],
@@ -461,7 +461,10 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByText("31 °C")).toBeInTheDocument();
     expect(screen.getAllByText("CRITIQUE")).toHaveLength(2);
     expect(screen.getAllByText("État simulé")).toHaveLength(2);
-    expect(screen.getAllByText(/20\/10\/2026/)).toHaveLength(3);
+    expect(
+      screen.getAllByText(/État simulé depuis le 20\/10\/2026/),
+    ).toHaveLength(2);
+    expect(screen.getAllByText(/20\/10\/2026/)).toHaveLength(5);
 
     fireEvent.click(screen.getByRole("tab", { name: "Vue d’ensemble" }));
     expect(screen.getByText("Température moyenne du système")).toBeInTheDocument();

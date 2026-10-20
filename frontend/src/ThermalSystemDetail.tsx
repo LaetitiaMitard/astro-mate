@@ -250,7 +250,9 @@ export default function ThermalSystemDetail({
                     {statusLabels[component.status]}
                   </span>
                   <span className="thermal-component-updated">
-                    {formatMeasurementDate(component.updatedAt)}
+                    {component.simulated
+                      ? `État simulé depuis le ${formatMeasurementDate(component.updatedAt)}`
+                      : `Dernière mesure : ${formatMeasurementDate(component.updatedAt)}`}
                   </span>
                 </li>
               ))}

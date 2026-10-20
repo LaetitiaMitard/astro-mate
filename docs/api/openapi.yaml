@@ -454,6 +454,7 @@ components:
         updatedAt:
           type: [string, 'null']
           format: date-time
+          description: Dernière mesure associée ou initialisation de l’état simulé.
         simulated:
           type: boolean
           description: Vrai lorsque l’état est simulé faute de métrique associée.

@@ -29,7 +29,7 @@ Représente un équipement d’un système, par exemple un radiateur, une pompe 
 | `systemId` | Système propriétaire |
 | `name` | Nom du composant |
 | `status` | État calculé depuis ses métriques, ou état simulé si aucune métrique n’y est associée |
-| `updatedAt` | Horodatage de la dernière mesure valide associée, le cas échéant |
+| `updatedAt` | Horodatage de la dernière mesure valide associée ou de l’initialisation de l’état simulé |
 
 Une valeur courante et son unité ne sont pas dupliquées sur le composant : elles proviennent de sa métrique. Les composants sans métrique n’affichent pas de valeur courante. Les composants n’ont pas d’état `OFFLINE`; cette disponibilité est portée par le système.
 

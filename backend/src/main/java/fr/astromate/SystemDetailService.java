@@ -125,6 +125,7 @@ class SystemDetailService {
 
     private final JdbcTemplate jdbcTemplate;
     private final DashboardService dashboardService;
+    private final Instant simulatedStateStartedAt = Instant.now();
 
     SystemDetailService(JdbcTemplate jdbcTemplate, DashboardService dashboardService) {
         this.jdbcTemplate = jdbcTemplate;
@@ -151,7 +152,12 @@ class SystemDetailService {
                 .map(key -> metric(key, measurements.get(key), now))
                 .toList();
         List<Component> components = system.components().stream()
-                .map(component -> component(component, measurements, now))
+                .map(component -> component(
+                        component,
+                        measurements,
+                        now,
+                        simulatedStateStartedAt
+                ))
                 .toList();
         List<DashboardResponse.Indicator> indicators = dashboard.indicators().stream()
                 .filter(indicator -> indicator.systemId().equals(systemId))
@@ -235,7 +241,8 @@ class SystemDetailService {
     private static Component component(
             ComponentMetadata metadata,
             Map<String, CurrentMeasurement> measurements,
-            Instant now
+            Instant now,
+            Instant simulatedStateStartedAt
     ) {
         if (metadata.metricKeys().isEmpty()) {
             return new Component(
@@ -244,7 +251,7 @@ class SystemDetailService {
                     "NOMINAL",
                     null,
                     null,
-                    null,
+                    simulatedStateStartedAt.toString(),
                     true
             );
         }

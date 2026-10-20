@@ -221,6 +221,7 @@ class AstroMateApplicationTest {
         assertThat(pump.path("status").asText()).isEqualTo("NOMINAL");
         assertThat(pump.path("value").isNull()).isTrue();
         assertThat(pump.path("simulated").asBoolean()).isTrue();
+        assertThat(pump.path("updatedAt").isNull()).isFalse();
 
         JsonNode radiatorMetric = findById(
         detail.path("metrics"),

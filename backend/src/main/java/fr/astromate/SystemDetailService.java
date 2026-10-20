@@ -8,11 +8,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 class SystemDetailService {
@@ -73,9 +72,55 @@ class SystemDetailService {
                     List.of()
             )
     );
-    private static final Map<String, String> COMPONENT_BY_METRIC = Map.of(
-            "radiatorATemperature", "radiator-a",
-            "radiatorBTemperature", "radiator-b"
+    private static final Map<String, MetricMetadata> METRIC_METADATA = Map.ofEntries(
+            Map.entry(
+                    "oxygen",
+                    new MetricMetadata("oxygen-level", "O₂", null)
+            ),
+            Map.entry(
+                    "carbonDioxide",
+                    new MetricMetadata("carbon-dioxide-level", "CO₂", null)
+            ),
+            Map.entry(
+                    "radiatorATemperature",
+                    new MetricMetadata(
+                            "radiator-a-temperature",
+                            "Température Radiateur A",
+                            "radiator-a"
+                    )
+            ),
+            Map.entry(
+                    "radiatorBTemperature",
+                    new MetricMetadata(
+                            "radiator-b-temperature",
+                            "Température Radiateur B",
+                            "radiator-b"
+                    )
+            ),
+            Map.entry(
+                    "fluidFlow",
+                    new MetricMetadata("fluid-flow", "Débit de fluide", null)
+            ),
+            Map.entry(
+                    "pressure",
+                    new MetricMetadata("pressure", "Pression", null)
+            ),
+            Map.entry(
+                    "thermalConsumption",
+                    new MetricMetadata(
+                            "thermal-consumption",
+                            "Consommation thermique",
+                            null
+                    )
+            ),
+            Map.entry(
+                    "availableEnergy",
+                    new MetricMetadata(
+                            "available-energy",
+                            "Énergie disponible",
+                            null
+                    )
+            )
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -95,8 +140,9 @@ class SystemDetailService {
                         "Système inconnu."
                 ));
         Map<String, CurrentMeasurement> measurements = readMeasurements();
+        DashboardResponse dashboard = dashboardService.getDashboard();
         Map<String, String> statuses = new LinkedHashMap<>();
-        dashboardService.getDashboard().systemStatuses()
+        dashboard.systemStatuses()
                 .forEach(state -> statuses.put(state.systemId(), state.status()));
         Map<String, String> availability = readAvailability();
         Instant now = Instant.now();
@@ -107,10 +153,9 @@ class SystemDetailService {
         List<Component> components = system.components().stream()
                 .map(component -> component(component, measurements, now))
                 .toList();
-        List<DashboardResponse.Indicator> indicators =
-                dashboardService.getDashboard().indicators().stream()
-                        .filter(indicator -> indicator.systemId().equals(systemId))
-                        .toList();
+        List<DashboardResponse.Indicator> indicators = dashboard.indicators().stream()
+                .filter(indicator -> indicator.systemId().equals(systemId))
+                .toList();
 
         return new SystemDetailResponse(
                 system.id(),
@@ -167,10 +212,11 @@ class SystemDetailService {
             Instant now
     ) {
         MetricStatusEvaluator.Rule rule = MetricStatusEvaluator.ruleFor(metricKey);
+        MetricMetadata metadata = METRIC_METADATA.get(metricKey);
         boolean valid = isValid(measurement, rule);
         return new Metric(
-                measurement == null ? metricKey : metricId(metricKey),
-                measurement == null ? metricName(metricKey) : measurement.name(),
+                metadata.id(),
+                measurement == null ? metadata.name() : measurement.name(),
                 rule.unit(),
                 valid ? measurement.value() : null,
                 status(metricKey, measurement, now).name(),
@@ -182,7 +228,7 @@ class SystemDetailService {
                 ),
                 new CriticalLimits(rule.criticalMin(), rule.criticalMax()),
                 valid ? measurement.measuredAt() : null,
-                COMPONENT_BY_METRIC.get(metricKey)
+                metadata.componentId()
         );
     }
 
@@ -267,13 +313,11 @@ class SystemDetailService {
             String systemId,
             Map<String, CurrentMeasurement> measurements
     ) {
-        Set<String> metricKeys = SYSTEMS.stream()
+        List<String> metricKeys = SYSTEMS.stream()
                 .filter(system -> system.id().equals(systemId))
                 .findFirst()
                 .orElseThrow()
-                .metricKeys()
-                .stream()
-                .collect(java.util.stream.Collectors.toSet());
+                .metricKeys();
         return measurements.values().stream()
                 .filter(measurement -> metricKeys.contains(measurement.metricKey()))
                 .filter(measurement -> isValid(
@@ -285,32 +329,6 @@ class SystemDetailService {
                 ))
                 .map(CurrentMeasurement::measuredAt)
                 .orElse(null);
-    }
-
-    private static String metricId(String metricKey) {
-        return switch (metricKey) {
-            case "radiatorATemperature" -> "radiator-a-temperature";
-            case "radiatorBTemperature" -> "radiator-b-temperature";
-            case "fluidFlow" -> "fluid-flow";
-            case "thermalConsumption" -> "thermal-consumption";
-            case "oxygen" -> "oxygen-level";
-            case "carbonDioxide" -> "carbon-dioxide-level";
-            case "availableEnergy" -> "available-energy";
-            default -> metricKey;
-        };
-    }
-
-    private static String metricName(String metricKey) {
-        return switch (metricKey) {
-            case "radiatorATemperature" -> "Température Radiateur A";
-            case "radiatorBTemperature" -> "Température Radiateur B";
-            case "fluidFlow" -> "Débit de fluide";
-            case "thermalConsumption" -> "Consommation thermique";
-            case "oxygen" -> "O₂";
-            case "carbonDioxide" -> "CO₂";
-            case "availableEnergy" -> "Énergie disponible";
-            default -> metricKey;
-        };
     }
 
     private record SystemMetadata(
@@ -336,6 +354,9 @@ class SystemDetailService {
             String unit,
             String measuredAt
     ) {
+    }
+
+    private record MetricMetadata(String id, String name, String componentId) {
     }
 
     private record SystemAvailability(String systemId, String availability) {

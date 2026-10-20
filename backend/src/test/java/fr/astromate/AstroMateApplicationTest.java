@@ -226,6 +226,14 @@ class AstroMateApplicationTest {
         detail.path("metrics"),
         "radiator-a-temperature"
         );
+        JsonNode dashboardTemperatureIndicator = findByKey(
+        detail.path("indicators"),
+        "temperature"
+        );
+        assertThat(dashboardTemperatureIndicator.path("value").asDouble())
+        .isEqualTo(26.7);
+        assertThat(dashboardTemperatureIndicator.path("status").asText())
+        .isEqualTo("CRITICAL");
         assertThat(radiatorMetric.path("status").asText()).isEqualTo("CRITICAL");
         assertThat(radiatorMetric.path("criticalLimits")
         .path("maxExclusive").asDouble()).isEqualTo(30);
@@ -373,6 +381,15 @@ class AstroMateApplicationTest {
             }
         }
         throw new AssertionError("Missing item: " + id);
+    }
+
+    private JsonNode findByKey(JsonNode items, String key) {
+        for (JsonNode item : items) {
+            if (item.path("key").asText().equals(key)) {
+                return item;
+            }
+        }
+        throw new AssertionError("Missing item: " + key);
     }
 
     private JsonNode getDashboard() {

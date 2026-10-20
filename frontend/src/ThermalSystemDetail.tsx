@@ -110,6 +110,52 @@ export default function ThermalSystemDetail({
       >
         {activeTab === "overview" && (
           <>
+            {detail.indicators
+              .filter((indicator) => indicator.key === "temperature")
+              .map((indicator) => {
+                const sourceMetric = detail.metrics.find((metric) =>
+                  indicator.sourceMetricIds.includes(metric.id),
+                );
+                return (
+                  <article
+                    className="thermal-metric-card thermal-aggregate-card"
+                    key={indicator.key}
+                  >
+                    <div className="indicator-card-heading">
+                      <h4>Température moyenne du système</h4>
+                      <span
+                        className={`metric-status status-${indicator.status.toLowerCase()}`}
+                      >
+                        {statusLabels[indicator.status]}
+                      </span>
+                    </div>
+                    <p className="thermal-metric-value">
+                      <strong>{formatValue(indicator.value)}</strong>
+                      <span>{indicator.unit}</span>
+                    </p>
+                    <dl className="thermal-reference-list">
+                      <div>
+                        <dt>Plage nominale</dt>
+                        <dd>{formatRange(indicator.nominalRange, indicator.unit)}</dd>
+                      </div>
+                      <div>
+                        <dt>Seuil critique</dt>
+                        <dd>
+                          {sourceMetric
+                            ? criticalThresholds(
+                                sourceMetric.criticalLimits,
+                                indicator.unit,
+                              )
+                            : "Aucun seuil critique de référence"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="thermal-aggregate-note">
+                      État déterminé par la mesure de radiateur la plus sévère.
+                    </p>
+                  </article>
+                );
+              })}
             <div className="section-heading">
               <div>
                 <p className="eyebrow">VALEURS ET RÉFÉRENCES</p>
@@ -151,6 +197,25 @@ export default function ThermalSystemDetail({
                 </article>
               ))}
             </div>
+            <section
+              className="thermal-events"
+              aria-labelledby="thermal-events-heading"
+            >
+              <h3 id="thermal-events-heading">Événements récents</h3>
+              {detail.recentEvents.length === 0 ? (
+                <p>Aucun événement récent</p>
+              ) : (
+                <ul>
+                  {detail.recentEvents.map((event) => (
+                    <li key={event.id}>
+                      <span>{formatMeasurementDate(event.occurredAt)}</span>
+                      <strong>{event.level}</strong>
+                      <span>{event.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </>
         )}
 

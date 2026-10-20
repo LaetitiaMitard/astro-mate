@@ -69,7 +69,24 @@ const thermalSystemDetail = {
   status: "CRITICAL",
   availability: "ONLINE",
   updatedAt: "2026-10-20T12:05:00Z",
-  indicators: [],
+  indicators: [
+    {
+      key: "temperature",
+      systemId: "thermal-control",
+      sourceMetricIds: ["radiator-a-temperature", "radiator-b-temperature"],
+      name: "Température",
+      value: 26.7,
+      unit: "°C",
+      status: "CRITICAL",
+      nominalRange: {
+        min: 18,
+        max: 26,
+        minInclusive: true,
+        maxInclusive: true,
+      },
+      measuredAt: "2026-10-20T12:05:00Z",
+    },
+  ],
   metrics: [
     {
       id: "radiator-a-temperature",
@@ -447,8 +464,13 @@ describe("AstroMate dashboard", () => {
     expect(screen.getAllByText(/20\/10\/2026/)).toHaveLength(3);
 
     fireEvent.click(screen.getByRole("tab", { name: "Vue d’ensemble" }));
-    expect(screen.getAllByText("18–26 °C")).toHaveLength(2);
-    expect(screen.getAllByText(/<15 °C.*>30 °C/)).toHaveLength(2);
+    expect(screen.getByText("Température moyenne du système")).toBeInTheDocument();
+    expect(screen.getByText("26,7")).toBeInTheDocument();
+    expect(
+      screen.getByText("Aucun événement récent"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("18–26 °C")).toHaveLength(3);
+    expect(screen.getAllByText(/<15 °C.*>30 °C/)).toHaveLength(3);
     expect(screen.getByText("80–200 L/min")).toBeInTheDocument();
     expect(screen.getByText("1,5–3 bar")).toBeInTheDocument();
     expect(screen.getByText(/Jusqu’à <2 kW/)).toBeInTheDocument();

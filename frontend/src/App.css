@@ -357,6 +357,49 @@ h1 {
   background: #151f2b;
 }
 
+.thermal-aggregate-card {
+  margin-bottom: 1rem;
+  border-color: #38506c;
+}
+
+.thermal-aggregate-note,
+.thermal-events p {
+  margin: 0.8rem 0 0;
+  color: #91a3b8;
+  font-size: 0.76rem;
+}
+
+.thermal-events {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #263342;
+}
+
+.thermal-events h3 {
+  margin-bottom: 0.7rem;
+  font-size: 0.95rem;
+}
+
+.thermal-events ul {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thermal-events li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  color: #c0ccda;
+  font-size: 0.78rem;
+}
+
+.thermal-events li span:first-child {
+  color: #91a3b8;
+}
+
 .thermal-metric-card h4,
 .thermal-component h4 {
   margin: 0;

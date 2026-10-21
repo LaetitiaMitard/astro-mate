@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.time.Duration;
@@ -17,6 +18,10 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -37,6 +42,9 @@ class AstroMateApplicationTest {
 
     @Autowired
     private MeasurementService measurementService;
+
+    @Autowired
+    private MeasurementChangeNotifier measurementChangeNotifier;
 
     @BeforeEach
     void resetDashboardMeasurements() {
@@ -106,6 +114,16 @@ class AstroMateApplicationTest {
         assertIndicator(indicators, "carbonDioxide", "400", "ppm", "0", "1000");
         assertIndicator(indicators, "temperature", "22.3", "°C", "18", "26");
         assertIndicator(indicators, "availableEnergy", "78", "%", "20", "100");
+    }
+
+    @Test
+    void publishesMeasurementChangesAfterTheDatabaseTransactionCommits() throws Exception {
+        SseEmitter subscriber = mock(SseEmitter.class);
+        measurementChangeNotifier.subscribe(subscriber);
+
+        measurementService.recordMeasurement("oxygen", 20, Instant.now());
+
+        verify(subscriber, times(2)).send(any(SseEmitter.SseEventBuilder.class));
     }
 
     @Test

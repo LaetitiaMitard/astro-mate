@@ -110,6 +110,7 @@ export default function App() {
     "loading",
   );
   const [pathname, setPathname] = useState(window.location.pathname);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [systemDetail, setSystemDetail] = useState<SystemDetail | null>(null);
   const [detailLoadState, setDetailLoadState] = useState<
     "loading" | "loaded" | "error"
@@ -118,6 +119,31 @@ export default function App() {
   const selectedSystem = systems.find(
     (system) => system.id === selectedSystemId,
   );
+
+  useEffect(() => {
+    if (typeof EventSource === "undefined") {
+      return;
+    }
+
+    const eventSource = new EventSource("/api/v1/telemetry/changes");
+    let refreshTimeout: number | null = null;
+    eventSource.onmessage = () => {
+      if (refreshTimeout !== null) {
+        window.clearTimeout(refreshTimeout);
+      }
+      refreshTimeout = window.setTimeout(
+        () => setRefreshVersion((version) => version + 1),
+        50,
+      );
+    };
+
+    return () => {
+      if (refreshTimeout !== null) {
+        window.clearTimeout(refreshTimeout);
+      }
+      eventSource.close();
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -134,7 +160,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [refreshVersion]);
 
   useEffect(() => {
     if (selectedSystemId !== "thermal-control") {
@@ -142,7 +168,9 @@ export default function App() {
     }
 
     const controller = new AbortController();
-    setDetailLoadState("loading");
+    setDetailLoadState((state) =>
+      state === "loaded" ? state : "loading",
+    );
 
     getSystemDetail(selectedSystemId, controller.signal)
       .then((result) => {
@@ -156,7 +184,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [selectedSystemId]);
+  }, [selectedSystemId, refreshVersion]);
 
   useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname);
@@ -242,6 +270,7 @@ export default function App() {
                 <ThermalSystemDetail
                   detail={systemDetail}
                   onNavigate={navigate}
+                  refreshVersion={refreshVersion}
                 />
               )
             ) : (

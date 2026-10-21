@@ -33,6 +33,25 @@ paths:
           $ref: '#/components/responses/ServiceUnavailable'
         '500':
           $ref: '#/components/responses/InternalError'
+  /telemetry/changes:
+    get:
+      tags: [Measurements]
+      operationId: subscribeToTelemetryChanges
+      summary: S'abonner aux changements de télémétrie
+      description: >-
+        Ouvre un flux Server-Sent Events. Un événement est envoyé à la connexion
+        puis après validation de chaque transaction modifiant les mesures ou la
+        disponibilité d'un système. Le client relit alors les ressources utiles.
+      responses:
+        '200':
+          description: Flux d'événements de changement
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: "data: updated\n\n"
+        '500':
+          $ref: '#/components/responses/InternalError'
   /systems:
     get:
       tags: [Systems]

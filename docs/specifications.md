@@ -176,7 +176,7 @@ La station est unique : son état global est une agrégation, pas une entité mu
 
 ## 7. Contrat API
 
-L’API HTTP locale est **contract-first**; [le contrat OpenAPI](./api/openapi.yaml) est la source de vérité. Le frontend l’interroge par HTTP toutes les 10 secondes. L’API n’expose que des opérations de lecture à l’interface; le simulateur met à jour les données en interne.
+L’API HTTP locale est **contract-first**; [le contrat OpenAPI](./api/openapi.yaml) est la source de vérité. Le frontend reçoit les notifications de changement par Server-Sent Events, puis relit par HTTP les ressources concernées. L’API n’expose que des opérations de lecture à l’interface; le simulateur met à jour les données en interne.
 
 Les ressources couvrent le tableau de bord, les systèmes, les séries de mesures, les alertes et le journal. Les dates sont des dates-heures ISO 8601 en UTC. Les erreurs utilisent `application/problem+json`; les paramètres invalides renvoient 400, un identifiant inconnu 404 et une indisponibilité de simulation/base locale 503.
 

@@ -45,6 +45,7 @@ function chartPoints(measurements: MeasurementSeries["measurements"]) {
 interface ThermalSystemDetailProps {
   detail: SystemDetail;
   onNavigate: (event: MouseEvent<HTMLAnchorElement>) => void;
+  refreshVersion: number;
 }
 
 function criticalThresholds(
@@ -68,6 +69,7 @@ function criticalThresholds(
 export default function ThermalSystemDetail({
   detail,
   onNavigate,
+  refreshVersion,
 }: ThermalSystemDetailProps) {
   const [activeTab, setActiveTab] = useState<ThermalTab>("overview");
   const [history, setHistory] = useState<MeasurementSeries | null>(null);
@@ -93,7 +95,7 @@ export default function ThermalSystemDetail({
       });
 
     return () => controller.abort();
-  }, []);
+  }, [refreshVersion]);
 
   return (
     <section className="system-detail thermal-detail" aria-labelledby="system-detail-heading">

@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import App from "./App";
+
+class TestEventSource {
+  static instance: TestEventSource | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  close = vi.fn();
+
+  constructor(readonly url: string) {
+    TestEventSource.instance = this;
+  }
+}
 
 const dashboard = {
   stationStatus: "NOMINAL",
@@ -225,7 +235,9 @@ const thermalTemperatureHistory = {
 
 afterEach(() => {
   cleanup();
+  window.history.replaceState(null, "", "/");
   vi.unstubAllGlobals();
+  TestEventSource.instance = null;
 });
 
 describe("AstroMate dashboard", () => {
@@ -262,6 +274,105 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByText("18–26 °C")).toBeInTheDocument();
     expect(screen.getByText("20–100 %")).toBeInTheDocument();
     expect(screen.getByText("Aucune alerte ouverte")).toBeInTheDocument();
+  });
+
+  it("refreshes the dashboard when the server reports a measurement change", async () => {
+    vi.stubGlobal("EventSource", TestEventSource);
+    const changedDashboard = {
+      ...dashboard,
+      indicators: dashboard.indicators.map((indicator) =>
+        indicator.key === "temperature"
+          ? { ...indicator, value: 27, status: "WARNING" }
+          : indicator,
+      ),
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(dashboard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(changedDashboard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByText("22,3")).toBeInTheDocument();
+    expect(TestEventSource.instance?.url).toBe("/api/v1/telemetry/changes");
+    act(() => {
+      TestEventSource.instance?.onmessage?.(new MessageEvent("message"));
+    });
+
+    expect(await screen.findByText("27")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes thermal details and history from the same server event", async () => {
+    vi.stubGlobal("EventSource", TestEventSource);
+    const changedDetail = {
+      ...thermalSystemDetail,
+      metrics: thermalSystemDetail.metrics.map((metric) =>
+        metric.id === "radiator-a-temperature"
+          ? { ...metric, value: 32 }
+          : metric,
+      ),
+      components: thermalSystemDetail.components.map((component) =>
+        component.id === "radiator-a" ? { ...component, value: 32 } : component,
+      ),
+    };
+    const changedHistory = {
+      ...thermalTemperatureHistory,
+      measurements: [
+        ...thermalTemperatureHistory.measurements,
+        { value: 30.2, measuredAt: "2026-10-20T12:00:10Z" },
+      ],
+    };
+    let detailRequests = 0;
+    let historyRequests = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        const payload = url.endsWith("/measurements")
+          ? (++historyRequests > 1 ? changedHistory : thermalTemperatureHistory)
+          : url.endsWith("/systems/thermal-control")
+            ? (++detailRequests > 1 ? changedDetail : thermalSystemDetail)
+            : dashboard;
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("link", { name: "Systèmes" }));
+    const systemsSection = await screen.findByRole("region", {
+      name: "Systèmes de la station",
+    });
+    fireEvent.click(
+      within(systemsSection).getByRole("link", { name: /Contrôle thermique/ }),
+    );
+    expect(await screen.findByText("31", { exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Historique" }));
+    expect(await screen.findByText("28,6 °C")).toBeInTheDocument();
+
+    act(() => {
+      TestEventSource.instance?.onmessage?.(new MessageEvent("message"));
+    });
+
+    expect(await screen.findByText("30,2 °C")).toBeInTheDocument();
+    expect(detailRequests).toBe(2);
+    expect(historyRequests).toBe(2);
   });
 
   it("makes the radiator average and its most severe status clear", async () => {

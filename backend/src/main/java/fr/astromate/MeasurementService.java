@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,9 +39,14 @@ class MeasurementService {
     );
 
     private final JdbcTemplate jdbcTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
-    MeasurementService(JdbcTemplate jdbcTemplate) {
+    MeasurementService(
+            JdbcTemplate jdbcTemplate,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -137,6 +143,7 @@ class MeasurementService {
                 || metricKey.equals("radiatorBTemperature")) {
             updateLegacyTemperatureProjection(measuredAt);
         }
+        eventPublisher.publishEvent(new MeasurementChangeEvent());
     }
 
     private void recordStatusTransition(
@@ -319,6 +326,7 @@ class MeasurementService {
         if (updated != 1) {
             throw new IllegalArgumentException("Système non initialisé : " + systemId);
         }
+        eventPublisher.publishEvent(new MeasurementChangeEvent());
     }
 
     private void updateLegacyIndicator(

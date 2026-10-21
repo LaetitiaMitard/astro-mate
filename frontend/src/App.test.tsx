@@ -276,6 +276,122 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByText("Aucune alerte ouverte")).toBeInTheDocument();
   });
 
+  it("shows alert episodes and navigates through the API pages without manual actions", async () => {
+    const alertsPage = (page: number) => ({
+      items: page === 0
+        ? [
+            {
+              id: "alert-open",
+              level: "CRITICAL",
+              systemId: "thermal-control",
+              systemName: "Contrôle thermique",
+              metricId: "radiator-a-temperature",
+              message: "Température critique",
+              status: "OPEN",
+              detectedAt: "2026-10-21T12:00:00Z",
+              resolvedAt: null,
+            },
+            {
+              id: "alert-resolved",
+              level: "WARNING",
+              systemId: "life-support",
+              systemName: "Support de vie",
+              metricId: "oxygen-level",
+              message: "Oxygène rétabli",
+              status: "RESOLVED",
+              detectedAt: "2026-10-20T12:00:00Z",
+              resolvedAt: "2026-10-20T12:10:00Z",
+            },
+          ]
+        : [
+            {
+              id: "alert-resolved-page-2",
+              level: "WARNING",
+              systemId: "power-supply",
+              systemName: "Alimentation électrique",
+              metricId: "available-energy",
+              message: "Énergie rétablie",
+              status: "RESOLVED",
+              detectedAt: "2026-10-19T12:00:00Z",
+              resolvedAt: "2026-10-19T12:20:00Z",
+            },
+          ],
+      page,
+      pageSize: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const requestUrl = new URL(url, window.location.origin);
+      const responsePage = requestUrl.pathname === "/api/v1/alerts"
+        ? alertsPage(Number(requestUrl.searchParams.get("page")))
+        : null;
+      const payload = responsePage === null
+        ? dashboard
+        : requestUrl.searchParams.get("status") === "RESOLVED"
+          ? {
+              ...responsePage,
+              items: responsePage.items.filter((alert) => alert.status === "RESOLVED"),
+              totalElements: 20,
+              totalPages: 1,
+            }
+          : responsePage;
+      return Promise.resolve(
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("link", { name: "Alertes" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Alertes de la station" }),
+    ).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Épisodes d’alerte" });
+    const rows = within(table).getAllByRole("row");
+    expect(within(rows[1]).getByText("Température critique")).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent("CRITICAL");
+    expect(rows[1]).toHaveTextContent("Ouverte");
+    const openAlertCells = within(rows[1]).getAllByRole("cell");
+    expect(openAlertCells[0]).toHaveTextContent("21/10/2026");
+    expect(openAlertCells[4]).toHaveTextContent("—");
+    expect(within(rows[2]).getByText("Oxygène rétabli")).toBeInTheDocument();
+    expect(rows[2]).toHaveTextContent("WARNING");
+    expect(rows[2]).toHaveTextContent("Résolue");
+    const resolvedAlertCells = within(rows[2]).getAllByRole("cell");
+    expect(resolvedAlertCells[0]).toHaveTextContent("20/10/2026");
+    expect(resolvedAlertCells[4]).toHaveTextContent("20/10/2026");
+    expect(
+      screen.getByRole("navigation", { name: "Pagination des alertes" }),
+    ).toHaveTextContent(/Page\s+1\s+sur\s+2/);
+    expect(screen.queryByRole("button", { name: /acquitter|résoudre/i }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Suivant" }));
+
+    expect(await screen.findByText("Énergie rétablie")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/alerts?page=1",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+
+    fireEvent.change(screen.getByLabelText("État"), {
+      target: { value: "RESOLVED" },
+    });
+
+    expect(await screen.findByText("Oxygène rétabli")).toBeInTheDocument();
+    expect(screen.queryByText("Température critique")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/alerts?page=0&status=RESOLVED",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
   it("shows recent technical events and navigates between pages", async () => {
     const eventLogPage = (page: number) => ({
       items: [

@@ -198,6 +198,89 @@ class AstroMateApplicationTest {
     }
 
     @Test
+    void servesOpenAndResolvedAlertsInPagesWithOpenAlertsFirst() {
+        Instant now = Instant.now();
+        for (int index = 0; index < 22; index++) {
+            boolean open = index < 2;
+            String id = "alert-" + index;
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO alert_episode
+                        (id, system_id, metric_id, metric_key, level, message,
+                         status, detected_at, resolved_at)
+                    VALUES (?, 'thermal-control', ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    id,
+                    "radiator-a-temperature-" + index,
+                    "radiatorATemperature-" + index,
+                    index == 0 ? "CRITICAL" : "WARNING",
+                    "Alerte " + index,
+                    open ? "OPEN" : "RESOLVED",
+                    now.minusSeconds(index).toString(),
+                    open ? null : now.minusSeconds(index - 1L).toString()
+            );
+        }
+
+        ResponseEntity<JsonNode> firstPage = restTemplate.getForEntity(
+                "/api/v1/alerts",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> secondPage = restTemplate.getForEntity(
+                "/api/v1/alerts?page=1",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> filtered = restTemplate.getForEntity(
+                "/api/v1/alerts?status=RESOLVED&level=WARNING&systemId=thermal-control&pageSize=2",
+                JsonNode.class
+        );
+
+        assertThat(firstPage.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode firstPageBody = firstPage.getBody();
+        assertThat(firstPageBody).isNotNull();
+        assertThat(firstPageBody.path("items")).hasSize(20);
+        assertThat(firstPageBody.path("items").get(0).path("id").asText())
+                .isEqualTo("alert-0");
+        assertThat(firstPageBody.path("items").get(0).path("status").asText())
+                .isEqualTo("OPEN");
+        assertThat(firstPageBody.path("items").get(0).path("level").asText())
+                .isEqualTo("CRITICAL");
+        assertThat(firstPageBody.path("items").get(0).path("detectedAt").asText())
+                .isEqualTo(now.toString());
+        assertThat(firstPageBody.path("items").get(0).path("resolvedAt").isNull())
+                .isTrue();
+        assertThat(firstPageBody.path("items").get(1).path("id").asText())
+                .isEqualTo("alert-1");
+        assertThat(firstPageBody.path("items").get(2).path("id").asText())
+                .isEqualTo("alert-2");
+        assertThat(firstPageBody.path("items").get(2).path("status").asText())
+                .isEqualTo("RESOLVED");
+        assertThat(firstPageBody.path("items").get(2).path("resolvedAt").asText())
+                .isNotBlank();
+        assertThat(firstPageBody.path("page").asInt()).isZero();
+        assertThat(firstPageBody.path("pageSize").asInt()).isEqualTo(20);
+        assertThat(firstPageBody.path("totalElements").asInt()).isEqualTo(22);
+        assertThat(firstPageBody.path("totalPages").asInt()).isEqualTo(2);
+
+        JsonNode secondPageBody = secondPage.getBody();
+        assertThat(secondPageBody).isNotNull();
+        assertThat(secondPageBody.path("items")).hasSize(2);
+        assertThat(secondPageBody.path("items").get(0).path("id").asText())
+                .isEqualTo("alert-20");
+        assertThat(secondPageBody.path("page").asInt()).isEqualTo(1);
+
+        JsonNode filteredBody = filtered.getBody();
+        assertThat(filtered.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(filteredBody).isNotNull();
+        assertThat(filteredBody.path("items")).hasSize(2);
+        assertThat(filteredBody.path("items").get(0).path("status").asText())
+                .isEqualTo("RESOLVED");
+        assertThat(filteredBody.path("items").get(0).path("level").asText())
+                .isEqualTo("WARNING");
+        assertThat(filteredBody.path("totalElements").asInt()).isEqualTo(20);
+        assertThat(filteredBody.path("pageSize").asInt()).isEqualTo(2);
+    }
+
+    @Test
     void publishesMeasurementChangesAfterTheDatabaseTransactionCommits() throws Exception {
         SseEmitter subscriber = mock(SseEmitter.class);
         measurementChangeNotifier.subscribe(subscriber);

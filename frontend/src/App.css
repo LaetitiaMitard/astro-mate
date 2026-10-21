@@ -785,20 +785,56 @@ h1 {
   margin: 2rem 0 2.5rem;
 }
 
+.alert-log-section {
+  margin: 2rem 0 2.5rem;
+}
+
+.alert-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.alert-filters label {
+  display: grid;
+  gap: 0.4rem;
+  color: #91a3b8;
+  font-size: 0.8rem;
+}
+
+.alert-filters select {
+  min-width: 10rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #38506c;
+  border-radius: 0.45rem;
+  background: #172637;
+  color: #d8e8ff;
+  font: inherit;
+}
+
+.alert-filters select:focus-visible {
+  outline: 2px solid #8fc8ff;
+  outline-offset: 3px;
+}
+
 .event-log-window,
-.event-log-empty {
+.event-log-empty,
+.alert-log-empty {
   color: #9daec0;
   font-size: 0.88rem;
 }
 
-.event-log-table-scroll {
+.event-log-table-scroll,
+.alert-log-table-scroll {
   overflow-x: auto;
   border: 1px solid #263647;
   border-radius: 0.8rem;
   background: #121b26;
 }
 
-.event-log-table {
+.event-log-table,
+.alert-log-table {
   width: 100%;
   border-collapse: collapse;
   color: #c0ccda;
@@ -807,18 +843,22 @@ h1 {
 }
 
 .event-log-table th,
-.event-log-table td {
+.event-log-table td,
+.alert-log-table th,
+.alert-log-table td {
   padding: 0.8rem 1rem;
   border-bottom: 1px solid #263342;
   white-space: nowrap;
 }
 
-.event-log-table th {
+.event-log-table th,
+.alert-log-table th {
   color: #91a3b8;
   font-weight: 600;
 }
 
-.event-log-table tbody tr:last-child td {
+.event-log-table tbody tr:last-child td,
+.alert-log-table tbody tr:last-child td {
   border-bottom: 0;
 }
 

@@ -93,6 +93,29 @@ export interface EventLogPage {
   totalPages: number;
 }
 
+export type AlertStatus = "OPEN" | "RESOLVED";
+export type AlertLevel = "INFO" | "WARNING" | "CRITICAL";
+
+export interface AlertEpisode {
+  id: string;
+  level: AlertLevel;
+  systemId: string;
+  systemName: string;
+  metricId: string | null;
+  message: string;
+  status: AlertStatus;
+  detectedAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AlertPage {
+  items: AlertEpisode[];
+  page: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export interface Dashboard {
   stationStatus: SystemStatus;
   offlineSystems: string[];
@@ -100,17 +123,7 @@ export interface Dashboard {
   simulationStatus: "ACTIVE" | "PAUSED" | "UNAVAILABLE";
   lastMeasurementAt: string | null;
   indicators: DashboardIndicator[];
-  recentOpenAlerts: {
-    id: string;
-    level: string;
-    systemId: string;
-    systemName: string;
-    metricId: string | null;
-    message: string;
-    status: string;
-    detectedAt: string;
-    resolvedAt: string | null;
-  }[];
+  recentOpenAlerts: AlertEpisode[];
 }
 
 const indicatorStatuses = ["NOMINAL", "WARNING", "CRITICAL", "UNKNOWN"];
@@ -163,18 +176,21 @@ function isIndicator(value: unknown): value is DashboardIndicator {
   );
 }
 
-function isAlert(value: unknown): value is Dashboard["recentOpenAlerts"][number] {
+function isAlert(value: unknown): value is AlertEpisode {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&
-    typeof value.level === "string" &&
+    isOneOf(value.level, ["INFO", "WARNING", "CRITICAL"]) &&
     typeof value.systemId === "string" &&
     typeof value.systemName === "string" &&
     (typeof value.metricId === "string" || value.metricId === null) &&
     typeof value.message === "string" &&
-    typeof value.status === "string" &&
+    isOneOf(value.status, ["OPEN", "RESOLVED"]) &&
     typeof value.detectedAt === "string" &&
-    (typeof value.resolvedAt === "string" || value.resolvedAt === null)
+    Number.isFinite(Date.parse(value.detectedAt)) &&
+    (typeof value.resolvedAt === "string" &&
+      Number.isFinite(Date.parse(value.resolvedAt)) ||
+      value.resolvedAt === null)
   );
 }
 
@@ -268,6 +284,29 @@ function isEventLogPage(value: unknown): value is EventLogPage {
     Array.isArray(value.items) &&
     value.items.length <= 100 &&
     value.items.every(isTechnicalEvent) &&
+    typeof value.page === "number" &&
+    Number.isInteger(value.page) &&
+    value.page >= 0 &&
+    typeof value.pageSize === "number" &&
+    Number.isInteger(value.pageSize) &&
+    value.pageSize >= 1 &&
+    value.pageSize <= 100 &&
+    value.items.length <= value.pageSize &&
+    typeof value.totalElements === "number" &&
+    Number.isInteger(value.totalElements) &&
+    value.totalElements >= 0 &&
+    typeof value.totalPages === "number" &&
+    Number.isInteger(value.totalPages) &&
+    value.totalPages === Math.ceil(value.totalElements / value.pageSize)
+  );
+}
+
+function isAlertPage(value: unknown): value is AlertPage {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.items) &&
+    value.items.length <= 100 &&
+    value.items.every(isAlert) &&
     typeof value.page === "number" &&
     Number.isInteger(value.page) &&
     value.page >= 0 &&
@@ -386,6 +425,40 @@ export async function getEvents(
   const payload: unknown = await response.json();
   if (!isEventLogPage(payload) || payload.page !== page) {
     throw new Error("Event log response is invalid");
+  }
+
+  return payload;
+}
+
+export async function getAlerts(
+  page: number,
+  filters: {
+    status?: AlertStatus;
+    level?: AlertLevel;
+    systemId?: string;
+  },
+  signal: AbortSignal,
+): Promise<AlertPage> {
+  const parameters = new URLSearchParams({ page: page.toString() });
+  if (filters.status) {
+    parameters.set("status", filters.status);
+  }
+  if (filters.level) {
+    parameters.set("level", filters.level);
+  }
+  if (filters.systemId) {
+    parameters.set("systemId", filters.systemId);
+  }
+
+  const response = await fetch(`/api/v1/alerts?${parameters}`, { signal });
+
+  if (!response.ok) {
+    throw new Error(`Alert list request failed with status ${response.status}`);
+  }
+
+  const payload: unknown = await response.json();
+  if (!isAlertPage(payload) || payload.page !== page) {
+    throw new Error("Alert list response is invalid");
   }
 
   return payload;

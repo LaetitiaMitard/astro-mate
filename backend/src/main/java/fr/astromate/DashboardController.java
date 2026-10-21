@@ -14,6 +14,7 @@ class DashboardController {
     private final DashboardService dashboardService;
     private final SystemDetailService systemDetailService;
     private final MeasurementHistoryService measurementHistoryService;
+    private final AlertLogService alertLogService;
     private final EventLogService eventLogService;
     private final MeasurementChangeNotifier measurementChangeNotifier;
 
@@ -21,12 +22,14 @@ class DashboardController {
             DashboardService dashboardService,
             SystemDetailService systemDetailService,
             MeasurementHistoryService measurementHistoryService,
+            AlertLogService alertLogService,
             EventLogService eventLogService,
             MeasurementChangeNotifier measurementChangeNotifier
     ) {
         this.dashboardService = dashboardService;
         this.systemDetailService = systemDetailService;
         this.measurementHistoryService = measurementHistoryService;
+        this.alertLogService = alertLogService;
         this.eventLogService = eventLogService;
         this.measurementChangeNotifier = measurementChangeNotifier;
     }
@@ -54,6 +57,17 @@ class DashboardController {
                 from,
                 to
         );
+    }
+
+    @GetMapping("/alerts")
+    AlertPageResponse getAlerts(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String systemId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize
+    ) {
+        return alertLogService.getAlerts(page, pageSize, status, level, systemId);
     }
 
     @GetMapping("/events")

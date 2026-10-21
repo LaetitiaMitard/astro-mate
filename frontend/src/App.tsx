@@ -11,6 +11,7 @@ import {
   formatRange,
   formatValue,
 } from "./dashboardFormat";
+import AlertLog from "./AlertLog";
 import EventLog from "./EventLog";
 import ThermalSystemDetail from "./ThermalSystemDetail";
 
@@ -117,6 +118,8 @@ export default function App() {
     "loading" | "loaded" | "error"
   >("loading");
   const isEventLogRoute = pathname === "/events";
+  const isAlertLogRoute = pathname === "/alerts";
+  const isHistoryRoute = isEventLogRoute || isAlertLogRoute;
   const selectedSystemId = pathname.match(/^\/systems\/([^/]+)\/?$/)?.[1];
   const selectedSystem = systems.find(
     (system) => system.id === selectedSystemId,
@@ -148,7 +151,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isEventLogRoute) {
+    if (isHistoryRoute) {
       return;
     }
 
@@ -166,7 +169,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [isEventLogRoute, refreshVersion]);
+  }, [isHistoryRoute, refreshVersion]);
 
   useEffect(() => {
     if (selectedSystemId !== "thermal-control") {
@@ -238,20 +241,24 @@ export default function App() {
         <a href="/systems" onClick={navigate}>
           Systèmes
         </a>
+        <a href="/alerts" onClick={navigate}>
+          Alertes
+        </a>
         <a href="/events" onClick={navigate}>
           Journal
         </a>
       </nav>
 
       {isEventLogRoute && <EventLog />}
+      {isAlertLogRoute && <AlertLog />}
 
-      {!isEventLogRoute && loadState === "loading" && (
+      {!isHistoryRoute && loadState === "loading" && (
         <p className="loading" role="status">
           Lecture de la simulation…
         </p>
       )}
 
-      {!isEventLogRoute && loadState === "error" && (
+      {!isHistoryRoute && loadState === "error" && (
         <section className="error-panel" role="alert">
           <p className="eyebrow">LECTURE IMPOSSIBLE</p>
           <h2>Tableau de bord indisponible</h2>
@@ -262,7 +269,7 @@ export default function App() {
         </section>
       )}
 
-      {!isEventLogRoute && loadState === "loaded" && dashboard && (
+      {!isHistoryRoute && loadState === "loaded" && dashboard && (
         isSystemRoute ? (
           selectedSystem ? (
             selectedSystem.id === "thermal-control" ? (

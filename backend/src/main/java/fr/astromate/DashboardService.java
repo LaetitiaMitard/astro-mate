@@ -120,8 +120,45 @@ class DashboardService {
                 "ACTIVE",
                 lastMeasurementAt,
                 indicators,
-                List.of()
+                readRecentOpenAlerts()
         );
+    }
+
+    private List<DashboardResponse.Alert> readRecentOpenAlerts() {
+        return jdbcTemplate.query(
+                """
+                SELECT id, level, system_id, metric_id, message, status,
+                       detected_at, resolved_at
+                FROM alert_episode
+                WHERE status = 'OPEN'
+                ORDER BY CASE level WHEN 'CRITICAL' THEN 0 ELSE 1 END,
+                         detected_at DESC
+                LIMIT 4
+                """,
+                (resultSet, rowNumber) -> new DashboardResponse.Alert(
+                        resultSet.getString("id"),
+                        resultSet.getString("level"),
+                        resultSet.getString("system_id"),
+                        systemName(resultSet.getString("system_id")),
+                        resultSet.getString("metric_id"),
+                        resultSet.getString("message"),
+                        resultSet.getString("status"),
+                        resultSet.getString("detected_at"),
+                        resultSet.getString("resolved_at")
+                )
+        );
+    }
+
+    private static String systemName(String systemId) {
+        return switch (systemId) {
+            case "life-support" -> "Support de vie";
+            case "thermal-control" -> "Contrôle thermique";
+            case "power-supply" -> "Alimentation électrique";
+            case "communications" -> "Communications";
+            default -> throw new IllegalStateException(
+                    "Système inattendu dans une alerte : " + systemId
+            );
+        };
     }
 
     private Map<String, Measurement> readMeasurements() {

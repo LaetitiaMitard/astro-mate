@@ -173,8 +173,39 @@ class SystemDetailService {
                 indicators,
                 metrics,
                 components,
-                List.of()
+                readRecentEvents(system.id())
         );
+    }
+
+    private List<SystemDetailResponse.Event> readRecentEvents(String systemId) {
+        return jdbcTemplate.query(
+                """
+                SELECT id, level, category, system_id, source, message, occurred_at
+                FROM station_event
+                WHERE system_id = ?
+                ORDER BY occurred_at DESC
+                LIMIT 20
+                """,
+                (resultSet, rowNumber) -> new SystemDetailResponse.Event(
+                        resultSet.getString("id"),
+                        resultSet.getString("level"),
+                        resultSet.getString("category"),
+                        resultSet.getString("system_id"),
+                        systemName(resultSet.getString("system_id")),
+                        resultSet.getString("source"),
+                        resultSet.getString("message"),
+                        resultSet.getString("occurred_at")
+                ),
+                systemId
+        );
+    }
+
+    private static String systemName(String systemId) {
+        return SYSTEMS.stream()
+                .filter(system -> system.id().equals(systemId))
+                .map(SystemMetadata::name)
+                .findFirst()
+                .orElse(null);
     }
 
     private Map<String, CurrentMeasurement> readMeasurements() {

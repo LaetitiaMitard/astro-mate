@@ -39,6 +39,8 @@ class AstroMateApplicationTest {
 
     @BeforeEach
     void resetDashboardMeasurements() {
+        jdbcTemplate.update("DELETE FROM station_event");
+        jdbcTemplate.update("DELETE FROM alert_episode");
         jdbcTemplate.update(
                 """
                 INSERT OR IGNORE INTO metric_measurement
@@ -200,6 +202,59 @@ class AstroMateApplicationTest {
         assertThat(criticalTemperature.path("value").decimalValue())
                 .isEqualByComparingTo("26.7");
         assertThat(criticalTemperature.path("status").asText()).isEqualTo("CRITICAL");
+    }
+
+    @Test
+    void followsThermalAlertEpisodesAndLogsOnlyMeaningfulTransitions() {
+        recordMeasurement("radiatorATemperature", 27);
+
+        JsonNode warningDashboard = getDashboard();
+        assertThat(warningDashboard.path("recentOpenAlerts")).hasSize(1);
+        assertThat(warningDashboard.path("recentOpenAlerts").get(0).path("level").asText())
+                .isEqualTo("WARNING");
+        assertThat(warningDashboard.path("recentOpenAlerts").get(0).path("metricId").asText())
+                .isEqualTo("radiator-a-temperature");
+        JsonNode warningEvents = getThermalEvents();
+        assertThat(warningEvents).hasSize(1);
+        assertThat(warningEvents.get(0).path("level").asText()).isEqualTo("WARNING");
+        assertThat(warningEvents.get(0).path("category").asText()).isEqualTo("ALERT");
+
+        recordMeasurement("radiatorATemperature", 27);
+        assertThat(getThermalEvents()).hasSize(1);
+
+        recordMeasurement("radiatorATemperature", 31);
+        JsonNode criticalDashboard = getDashboard();
+        assertThat(criticalDashboard.path("recentOpenAlerts")).hasSize(1);
+        assertThat(criticalDashboard.path("recentOpenAlerts").get(0).path("level").asText())
+                .isEqualTo("CRITICAL");
+        JsonNode criticalEvents = getThermalEvents();
+        assertThat(criticalEvents).hasSize(3);
+        assertThat(criticalEvents.findValuesAsText("level"))
+                .containsExactlyInAnyOrder("WARNING", "INFO", "CRITICAL");
+
+        recordMeasurement("radiatorATemperature", 22.1);
+        assertThat(getDashboard().path("recentOpenAlerts")).isEmpty();
+        JsonNode resolvedEvents = getThermalEvents();
+        assertThat(resolvedEvents).hasSize(4);
+        assertThat(resolvedEvents.get(0).path("level").asText()).isEqualTo("INFO");
+
+        recordMeasurement("radiatorATemperature", 22.1);
+        assertThat(getThermalEvents()).hasSize(4);
+    }
+
+    @Test
+    void deescalatesCriticalThermalAlertIntoANewWarningEpisode() {
+        recordMeasurement("radiatorATemperature", 31);
+        assertThat(getDashboard().path("recentOpenAlerts").get(0).path("level").asText())
+                .isEqualTo("CRITICAL");
+
+        recordMeasurement("radiatorATemperature", 27);
+        JsonNode warningDashboard = getDashboard();
+        assertThat(warningDashboard.path("recentOpenAlerts")).hasSize(1);
+        assertThat(warningDashboard.path("recentOpenAlerts").get(0).path("level").asText())
+                .isEqualTo("WARNING");
+        assertThat(getThermalEvents().findValuesAsText("level"))
+                .containsExactlyInAnyOrder("CRITICAL", "INFO", "WARNING");
     }
 
     @Test
@@ -405,6 +460,17 @@ class AstroMateApplicationTest {
         JsonNode dashboard = response.getBody();
         assertThat(dashboard).isNotNull();
         return dashboard;
+    }
+
+    private JsonNode getThermalEvents() {
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+                "/api/v1/systems/thermal-control",
+                JsonNode.class
+        );
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode detail = response.getBody();
+        assertThat(detail).isNotNull();
+        return detail.path("recentEvents");
     }
 
     private String getSystemStatus(JsonNode dashboard, String systemId) {

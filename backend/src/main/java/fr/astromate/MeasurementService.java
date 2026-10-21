@@ -3,8 +3,10 @@ package fr.astromate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +56,24 @@ class MeasurementService {
             throw new IllegalArgumentException("L’horodatage de mesure est obligatoire.");
         }
 
+        List<MetricSnapshot> previousMeasurements = jdbcTemplate.query(
+                """
+                SELECT system_id, metric_id, name
+                FROM metric_measurement
+                WHERE metric_key = ?
+                """,
+                (resultSet, rowNumber) -> new MetricSnapshot(
+                        resultSet.getString("system_id"),
+                        resultSet.getString("metric_id"),
+                        resultSet.getString("name")
+                ),
+                metricKey
+        );
+        if (previousMeasurements.isEmpty()) {
+            throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
+        }
+        MetricSnapshot metric = previousMeasurements.get(0);
+
         int updated = jdbcTemplate.update(
                 """
                 UPDATE metric_measurement
@@ -69,6 +89,13 @@ class MeasurementService {
             throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
         }
 
+        updateAlertEpisode(
+                metricKey,
+                metric,
+                MetricStatusEvaluator.evaluate(metricKey, canonicalValue),
+                measuredAt
+        );
+
         String legacyIndicatorKey = LEGACY_INDICATOR_KEYS.get(metricKey);
         if (legacyIndicatorKey != null) {
             updateLegacyIndicator(legacyIndicatorKey, canonicalValue, measuredAt);
@@ -76,6 +103,123 @@ class MeasurementService {
                 || metricKey.equals("radiatorBTemperature")) {
             updateLegacyTemperatureProjection(measuredAt);
         }
+    }
+
+    private void updateAlertEpisode(
+            String metricKey,
+            MetricSnapshot metric,
+            MetricStatus nextStatus,
+            Instant occurredAt
+    ) {
+        List<AlertEpisode> openEpisodes = jdbcTemplate.query(
+                """
+                SELECT id, level
+                FROM alert_episode
+                WHERE metric_key = ? AND status = 'OPEN'
+                """,
+                (resultSet, rowNumber) -> new AlertEpisode(
+                        resultSet.getString("id"),
+                        resultSet.getString("level")
+                ),
+                metricKey
+        );
+        AlertEpisode openEpisode = openEpisodes.isEmpty() ? null : openEpisodes.get(0);
+        if (openEpisode != null && openEpisode.level().equals(nextStatus.name())) {
+            return;
+        }
+
+        if (openEpisode != null) {
+            resolveAlertEpisode(openEpisode, metricKey, metric, occurredAt);
+        }
+        if (nextStatus == MetricStatus.WARNING || nextStatus == MetricStatus.CRITICAL) {
+            createAlertEpisode(metricKey, metric, nextStatus, occurredAt);
+        }
+    }
+
+    private void resolveAlertEpisode(
+            AlertEpisode episode,
+            String metricKey,
+            MetricSnapshot metric,
+            Instant resolvedAt
+    ) {
+        int updated = jdbcTemplate.update(
+                """
+                UPDATE alert_episode
+                SET status = 'RESOLVED', resolved_at = ?
+                WHERE id = ? AND status = 'OPEN'
+                """,
+                resolvedAt.toString(),
+                episode.id()
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("L’alerte ouverte a changé pendant sa résolution.");
+        }
+        insertAlertEvent(
+                metricKey,
+                metric.systemId(),
+                "INFO",
+                "Alerte " + alertLevelLabel(episode.level())
+                        + " résolue pour " + metric.name() + ".",
+                resolvedAt
+        );
+    }
+
+    private void createAlertEpisode(
+            String metricKey,
+            MetricSnapshot metric,
+            MetricStatus level,
+            Instant detectedAt
+    ) {
+        String message = "Seuil " + alertLevelLabel(level.name())
+                + " dépassé pour " + metric.name() + ".";
+        jdbcTemplate.update(
+                """
+                INSERT INTO alert_episode
+                    (id, system_id, metric_id, metric_key, level, message, status,
+                     detected_at, resolved_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, NULL)
+                """,
+                UUID.randomUUID().toString(),
+                metric.systemId(),
+                metric.metricId(),
+                metricKey,
+                level.name(),
+                message,
+                detectedAt.toString()
+        );
+        insertAlertEvent(metricKey, metric.systemId(), level.name(), message, detectedAt);
+    }
+
+    private static String alertLevelLabel(String level) {
+        return switch (level) {
+            case "WARNING" -> "d’avertissement";
+            case "CRITICAL" -> "critique";
+            default -> throw new IllegalArgumentException(
+                    "Niveau d’alerte non pris en charge : " + level
+            );
+        };
+    }
+
+    private void insertAlertEvent(
+            String metricKey,
+            String systemId,
+            String level,
+            String message,
+            Instant occurredAt
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO station_event
+                    (id, system_id, level, category, source, message, occurred_at)
+                VALUES (?, ?, ?, 'ALERT', ?, ?, ?)
+                """,
+                UUID.randomUUID().toString(),
+                systemId,
+                level,
+                metricKey,
+                message,
+                occurredAt.toString()
+        );
     }
 
     @Transactional
@@ -148,5 +292,15 @@ class MeasurementService {
                     "Projection de compatibilité de température absente."
             );
         }
+    }
+
+    private record MetricSnapshot(
+            String systemId,
+            String metricId,
+            String name
+    ) {
+    }
+
+    private record AlertEpisode(String id, String level) {
     }
 }

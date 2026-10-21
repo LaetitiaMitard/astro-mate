@@ -19,7 +19,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.datasource.url=jdbc:sqlite::memory:"
+        properties = {
+                "spring.datasource.url=jdbc:sqlite::memory:",
+                "astromate.simulation.enabled=false"
+        }
 )
 class AstroMateApplicationTest {
     @Autowired

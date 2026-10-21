@@ -22,6 +22,21 @@ Le socle local comprend le tableau de bord, la liste des systèmes et le calcul
 des états des métriques selon les seuils configurés. Les autres vues et
 capacités décrites dans les spécifications restent à implémenter.
 
+## Scénario thermique
+
+La simulation démarre automatiquement avec le backend et produit une télémétrie
+toutes les 10 secondes. Les deux radiateurs suivent quatre phases de 60 secondes :
+22,1/22,4 °C, 27 °C chacun, 31 °C chacun, puis 22,1/22,4 °C, avant de répéter
+le cycle. Les autres métriques restent nominales et sont rafraîchies à la même
+cadence. La température affichée est leur moyenne, mais l’état thermique suit
+toujours le radiateur le plus sévèrement dégradé.
+
+À ce stade, le cycle repart de la première phase au démarrage du backend.
+La persistance de la phase et sa reprise sont prévues dans le ticket
+[#16](https://github.com/LaetitiaMitard/astro-mate/issues/16).
+Pour désactiver la production automatique, utiliser la propriété Spring
+`astromate.simulation.enabled=false`.
+
 ## Architecture prévue
 
 - **Interface** : React, TypeScript et Vite.

@@ -1,5 +1,6 @@
 package fr.astromate;
 
+import java.time.Clock;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -10,6 +11,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class AstroMateApplication {
     public static void main(String[] args) {
         SpringApplication.run(AstroMateApplication.class, args);
+    }
+
+    @Bean
+    Clock simulationClock() {
+        return Clock.systemUTC();
     }
 
     @Bean

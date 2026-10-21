@@ -210,6 +210,19 @@ const thermalSystemDetail = {
   recentEvents: [],
 };
 
+const thermalTemperatureHistory = {
+  indicatorKey: "temperature",
+  sourceMetricIds: ["radiator-a-temperature", "radiator-b-temperature"],
+  name: "Température",
+  unit: "°C",
+  from: "2026-10-20T06:00:00Z",
+  to: "2026-10-20T12:00:00Z",
+  measurements: [
+    { value: 22.3, measuredAt: "2026-10-20T11:59:50Z" },
+    { value: 28.6, measuredAt: "2026-10-20T12:00:00Z" },
+  ],
+};
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -347,9 +360,11 @@ describe("AstroMate dashboard", () => {
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
         const url = typeof input === "string" ? input : input.toString();
-        const payload = url.includes("/systems/thermal-control")
-          ? thermalSystemDetail
-          : systemsDashboard;
+        const payload = url.endsWith("/measurements")
+          ? thermalTemperatureHistory
+          : url.endsWith("/systems/thermal-control")
+            ? thermalSystemDetail
+            : systemsDashboard;
         return Promise.resolve(
           new Response(JSON.stringify(payload), {
             status: 200,
@@ -428,9 +443,11 @@ describe("AstroMate dashboard", () => {
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
         const url = typeof input === "string" ? input : input.toString();
-        const payload = url.includes("/systems/thermal-control")
-          ? thermalSystemDetail
-          : dashboard;
+        const payload = url.endsWith("/measurements")
+          ? thermalTemperatureHistory
+          : url.endsWith("/systems/thermal-control")
+            ? thermalSystemDetail
+            : dashboard;
         return Promise.resolve(
           new Response(JSON.stringify(payload), {
             status: 200,
@@ -481,6 +498,18 @@ describe("AstroMate dashboard", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Historique" }));
     expect(screen.getByRole("heading", { name: "Historique thermique" }))
       .toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", {
+        name: /Courbe de température en °C sur les six dernières heures/,
+      }),
+    ).toBeInTheDocument();
+    const historyTable = screen.getByRole("table", {
+      name: "Mesures thermiques des six dernières heures",
+    });
+    expect(
+      within(historyTable).getByText("2026-10-20T11:59:50Z"),
+    ).toBeInTheDocument();
+    expect(within(historyTable).getByText("28,6 °C")).toBeInTheDocument();
     expect(
       screen.getByRole("tab", { name: "Maintenance" }),
     ).toBeDisabled();

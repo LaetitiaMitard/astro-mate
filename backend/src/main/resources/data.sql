@@ -28,3 +28,39 @@ VALUES
     ('thermal-control', 'ONLINE'),
     ('power-supply', 'ONLINE'),
     ('communications', 'ONLINE');
+
+WITH RECURSIVE sample_points(sample_index) AS (
+    SELECT 0
+    UNION ALL
+    SELECT sample_index + 1
+    FROM sample_points
+    WHERE sample_index < 2160
+),
+history_values(metric_key, value, unit) AS (
+    VALUES
+        ('oxygen', 21, '% vol.'),
+        ('carbonDioxide', 400, 'ppm'),
+        ('radiatorATemperature', 22.1, '°C'),
+        ('radiatorBTemperature', 22.4, '°C'),
+        ('availableEnergy', 78, '%'),
+        ('fluidFlow', 120, 'L/min'),
+        ('pressure', 2.1, 'bar'),
+        ('thermalConsumption', 1.2, 'kW')
+)
+INSERT OR IGNORE INTO measurement_history (metric_key, value, unit, measured_at)
+SELECT
+    history_values.metric_key,
+    history_values.value,
+    history_values.unit,
+    strftime(
+        '%Y-%m-%dT%H:%M:%fZ',
+        'now',
+        printf('%+d seconds', (sample_points.sample_index - 2160) * 10)
+    )
+FROM sample_points
+CROSS JOIN history_values
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM measurement_history existing
+    WHERE existing.metric_key = history_values.metric_key
+);

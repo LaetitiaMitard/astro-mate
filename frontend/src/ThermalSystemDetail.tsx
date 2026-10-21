@@ -1,5 +1,9 @@
-import { useState, type MouseEvent } from "react";
-import type { SystemDetail } from "./dashboardApi";
+import { useEffect, useState, type MouseEvent } from "react";
+import {
+  getIndicatorMeasurements,
+  type MeasurementSeries,
+  type SystemDetail,
+} from "./dashboardApi";
 import {
   formatMeasurementDate,
   formatRange,
@@ -15,6 +19,28 @@ const statusLabels: Record<SystemDetail["status"], string> = {
 };
 
 type ThermalTab = "overview" | "components" | "history";
+
+function chartPoints(measurements: MeasurementSeries["measurements"]) {
+  const values = measurements.map((measurement) => measurement.value);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const valueRange = maximum - minimum;
+  const firstTime = Date.parse(measurements[0].measuredAt);
+  const timeRange =
+    Date.parse(measurements[measurements.length - 1].measuredAt) - firstTime;
+
+  return measurements
+    .map((measurement, index) => {
+      const x = timeRange === 0
+        ? 360
+        : 24 + ((Date.parse(measurement.measuredAt) - firstTime) / timeRange) * 672;
+      const y = valueRange === 0
+        ? 111
+        : 198 - ((measurement.value - minimum) / valueRange) * 174;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
 
 interface ThermalSystemDetailProps {
   detail: SystemDetail;
@@ -44,6 +70,30 @@ export default function ThermalSystemDetail({
   onNavigate,
 }: ThermalSystemDetailProps) {
   const [activeTab, setActiveTab] = useState<ThermalTab>("overview");
+  const [history, setHistory] = useState<MeasurementSeries | null>(null);
+  const [historyLoadState, setHistoryLoadState] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getIndicatorMeasurements(
+      "thermal-control",
+      "temperature",
+      controller.signal,
+    )
+      .then((result) => {
+        setHistory(result);
+        setHistoryLoadState("loaded");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setHistoryLoadState("error");
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   return (
     <section className="system-detail thermal-detail" aria-labelledby="system-detail-heading">
@@ -264,10 +314,79 @@ export default function ThermalSystemDetail({
           <div className="thermal-history">
             <p className="eyebrow">MESURES HORODATÉES</p>
             <h3>Historique thermique</h3>
-            <p>
-              L’API fournit actuellement la dernière mesure valide de chaque
-              métrique, sans historique de mesures.
-            </p>
+            {historyLoadState === "loading" && (
+              <p role="status">Chargement de l’historique thermique…</p>
+            )}
+            {historyLoadState === "error" && (
+              <section className="error-panel" role="alert">
+                <p className="eyebrow">LECTURE IMPOSSIBLE</p>
+                <p>L’historique thermique est indisponible.</p>
+              </section>
+            )}
+            {historyLoadState === "loaded" && history && (
+              history.measurements.length === 0 ? (
+                <p>Aucune mesure disponible sur les six dernières heures.</p>
+              ) : (
+                <>
+                  <p>
+                    Température moyenne calculée à partir des mesures horodatées
+                    de Radiateur A et Radiateur B.
+                  </p>
+                  <figure className="thermal-history-chart">
+                    <svg
+                      viewBox="0 0 720 220"
+                      role="img"
+                      aria-label={`Courbe de ${history.name.toLowerCase()} en ${history.unit} sur les six dernières heures`}
+                    >
+                      <line x1="24" y1="198" x2="696" y2="198" />
+                      <line x1="24" y1="24" x2="24" y2="198" />
+                      <polyline points={chartPoints(history.measurements)} />
+                      {new Set(
+                        history.measurements.map((measurement) => measurement.measuredAt),
+                      ).size === 1 && (
+                        <circle
+                          cx="360"
+                          cy="111"
+                          r="4"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </svg>
+                    <figcaption>
+                      Valeurs en {history.unit}; les horodatages et valeurs
+                      exacts sont disponibles dans le tableau.
+                    </figcaption>
+                  </figure>
+                  <div className="thermal-history-table-scroll">
+                    <table className="thermal-history-table">
+                      <caption>
+                        Mesures thermiques des six dernières heures
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Horodatage UTC</th>
+                          <th scope="col">{history.name} ({history.unit})</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.measurements.map((measurement) => (
+                          <tr key={measurement.measuredAt}>
+                            <td>
+                              <time dateTime={measurement.measuredAt}>
+                                {measurement.measuredAt}
+                              </time>
+                            </td>
+                            <td>
+                              {formatValue(measurement.value)} {history.unit}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )
+            )}
           </div>
         )}
       </section>

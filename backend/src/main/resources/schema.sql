@@ -21,6 +21,17 @@ CREATE TABLE IF NOT EXISTS metric_measurement (
     measured_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS measurement_history (
+    metric_key TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT NOT NULL,
+    measured_at TEXT NOT NULL,
+    PRIMARY KEY (metric_key, measured_at)
+);
+
+CREATE INDEX IF NOT EXISTS measurement_history_measured_at
+    ON measurement_history(measured_at);
+
 CREATE TABLE IF NOT EXISTS system_availability (
     system_id TEXT PRIMARY KEY,
     availability TEXT NOT NULL CHECK (availability IN ('ONLINE', 'OFFLINE'))

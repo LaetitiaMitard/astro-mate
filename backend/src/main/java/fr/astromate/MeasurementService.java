@@ -2,6 +2,7 @@ package fr.astromate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +98,25 @@ class MeasurementService {
         if (updated != 1) {
             throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
         }
+        jdbcTemplate.update(
+                """
+                INSERT INTO measurement_history (metric_key, value, unit, measured_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(metric_key, measured_at) DO UPDATE
+                SET value = excluded.value, unit = excluded.unit
+                """,
+                metricKey,
+                canonicalValue,
+                MetricStatusEvaluator.ruleFor(metricKey).unit(),
+                measuredAt.toString()
+        );
+        jdbcTemplate.update(
+                """
+                DELETE FROM measurement_history
+                WHERE julianday(measured_at) < julianday(?)
+                """,
+                Instant.now().minus(Duration.ofHours(6)).toString()
+        );
 
         MetricStatus nextStatus = MetricStatusEvaluator.evaluate(
                 metricKey,

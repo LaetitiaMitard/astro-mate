@@ -61,6 +61,19 @@ export interface SystemDetail {
   }[];
 }
 
+export interface MeasurementSeries {
+  indicatorKey: string;
+  sourceMetricIds: string[];
+  name: string;
+  unit: string;
+  from: string;
+  to: string;
+  measurements: {
+    value: number;
+    measuredAt: string;
+  }[];
+}
+
 export interface Dashboard {
   stationStatus: SystemStatus;
   offlineSystems: string[];
@@ -229,6 +242,34 @@ function isSystemDetail(value: unknown): value is SystemDetail {
   );
 }
 
+function isMeasurementSeries(
+  value: unknown,
+  indicatorKey: string,
+): value is MeasurementSeries {
+  return (
+    isRecord(value) &&
+    value.indicatorKey === indicatorKey &&
+    Array.isArray(value.sourceMetricIds) &&
+    value.sourceMetricIds.length > 0 &&
+    value.sourceMetricIds.every((metricId) => typeof metricId === "string") &&
+    typeof value.name === "string" &&
+    typeof value.unit === "string" &&
+    typeof value.from === "string" &&
+    Number.isFinite(Date.parse(value.from)) &&
+    typeof value.to === "string" &&
+    Number.isFinite(Date.parse(value.to)) &&
+    Array.isArray(value.measurements) &&
+    value.measurements.every(
+      (measurement) =>
+        isRecord(measurement) &&
+        typeof measurement.value === "number" &&
+        Number.isFinite(measurement.value) &&
+        typeof measurement.measuredAt === "string" &&
+        Number.isFinite(Date.parse(measurement.measuredAt)),
+    )
+  );
+}
+
 function isDashboard(value: unknown): value is Dashboard {
   return (
     isRecord(value) &&
@@ -285,6 +326,30 @@ export async function getSystemDetail(
   const payload: unknown = await response.json();
   if (!isSystemDetail(payload) || payload.id !== systemId) {
     throw new Error("System detail response is invalid");
+  }
+
+  return payload;
+}
+
+export async function getIndicatorMeasurements(
+  systemId: string,
+  indicatorKey: string,
+  signal: AbortSignal,
+): Promise<MeasurementSeries> {
+  const response = await fetch(
+    `/api/v1/systems/${encodeURIComponent(systemId)}/indicators/${encodeURIComponent(indicatorKey)}/measurements`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Measurement history request failed with status ${response.status}`,
+    );
+  }
+
+  const payload: unknown = await response.json();
+  if (!isMeasurementSeries(payload, indicatorKey)) {
+    throw new Error("Measurement history response is invalid");
   }
 
   return payload;

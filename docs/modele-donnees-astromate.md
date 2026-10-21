@@ -70,6 +70,8 @@ Les mesures invalides ne sont pas enregistrées comme mesures valides. Les mesur
 
 Le backend initialise les dernières mesures canoniques dans `metric_measurement`. Cette initialisation idempotente reprend O₂, CO₂ et l’énergie depuis la table historique `dashboard_indicator`, et initialise séparément les mesures des deux radiateurs, le débit, la pression et la consommation. `dashboard_indicator` reste une projection de compatibilité; la température courante est calculée depuis les deux radiateurs et n’est pas lue comme une mesure indépendante.
 
+Les échantillons horodatés sont conservés dans `measurement_history` sur les six dernières heures, avec la métrique source, sa valeur et son unité canonique. La série de température joint les mesures des deux radiateurs au même horodatage et en calcule la moyenne arrondie au dixième; aucune mesure agrégée distincte n’est enregistrée.
+
 ### Alert
 
 Représente un épisode d’anomalie de métrique suivi de son ouverture à sa résolution.

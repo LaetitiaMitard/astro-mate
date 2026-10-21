@@ -78,9 +78,11 @@ paths:
       summary: Lire l'historique d'un indicateur système
       description: >-
         L'indicateur température du contrôle thermique est calculé comme la
-        moyenne des mesures des deux radiateurs, à chaque horodatage.
-        La période par défaut couvre les six dernières heures. La rétention
-        effective des mesures est limitée à cette fenêtre.
+        moyenne arrondie au dixième des mesures des deux radiateurs ayant le
+        même horodatage; cette température agrégée n'est pas persistée.
+        La période par défaut couvre les six dernières heures. Toute période
+        demandée est limitée à cette fenêtre et à l'heure courante. La borne
+        basse est inclusive et la borne haute exclusive.
       parameters:
         - $ref: '#/components/parameters/SystemId'
         - name: indicatorKey

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +40,7 @@ class AstroMateApplicationTest {
 
     @BeforeEach
     void resetDashboardMeasurements() {
+        jdbcTemplate.update("DELETE FROM measurement_history");
         jdbcTemplate.update(
                 "UPDATE metric_measurement SET measured_at = '1970-01-01T00:00:00Z'"
         );
@@ -68,6 +70,7 @@ class AstroMateApplicationTest {
         }
         jdbcTemplate.update("DELETE FROM station_event");
         jdbcTemplate.update("DELETE FROM alert_episode");
+        jdbcTemplate.update("DELETE FROM measurement_history");
     }
 
     @Test
@@ -103,6 +106,94 @@ class AstroMateApplicationTest {
         assertIndicator(indicators, "carbonDioxide", "400", "ppm", "0", "1000");
         assertIndicator(indicators, "temperature", "22.3", "°C", "18", "26");
         assertIndicator(indicators, "availableEnergy", "78", "%", "20", "100");
+    }
+
+    @Test
+    void servesTemperatureHistoryAsTheRoundedAverageOfRadiators() {
+        Instant sampledAt = Instant.now();
+        measurementService.recordMeasurement(
+                "radiatorATemperature",
+                30,
+                sampledAt
+        );
+        measurementService.recordMeasurement(
+                "radiatorBTemperature",
+                27.1,
+                sampledAt
+        );
+
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+                "/api/v1/systems/thermal-control/indicators/temperature/measurements",
+                JsonNode.class
+        );
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode series = response.getBody();
+        assertThat(series).isNotNull();
+        assertThat(series.path("indicatorKey").asText()).isEqualTo("temperature");
+        assertThat(series.path("unit").asText()).isEqualTo("°C");
+        JsonNode sourceMetricIds = series.path("sourceMetricIds");
+        assertThat(sourceMetricIds).hasSize(2);
+        assertThat(sourceMetricIds.get(0).asText())
+                .isEqualTo("radiator-a-temperature");
+        assertThat(sourceMetricIds.get(1).asText())
+                .isEqualTo("radiator-b-temperature");
+        JsonNode measurements = series.path("measurements");
+        assertThat(measurements).hasSize(1);
+        assertThat(measurements.get(0).path("value").decimalValue())
+                .isEqualByComparingTo("28.6");
+        assertThat(measurements.get(0).path("measuredAt").asText())
+                .isEqualTo(sampledAt.toString());
+    }
+
+    @Test
+    void limitsTemperatureHistoryToTheRequestedSixHourWindow() {
+        Instant now = Instant.now();
+        Instant outsideWindow = now.minus(Duration.ofHours(6)).minusSeconds(5);
+        Instant withinWindow = now.minus(Duration.ofHours(2));
+        Instant future = now.plusSeconds(30);
+        insertTemperaturePair(outsideWindow, 20, 20);
+        insertTemperaturePair(withinWindow, 21.4, 22.1);
+        insertTemperaturePair(future, 24, 24);
+
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+                "/api/v1/systems/thermal-control/indicators/temperature/measurements",
+                JsonNode.class
+        );
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode measurements = response.getBody().path("measurements");
+        assertThat(measurements).hasSize(1);
+        assertThat(measurements.get(0).path("measuredAt").asText())
+                .isEqualTo(withinWindow.toString());
+        assertThat(measurements.get(0).path("value").decimalValue())
+                .isEqualByComparingTo("21.8");
+    }
+
+    @Test
+    void includesTheRequestedStartAndExcludesTheRequestedEnd() {
+        Instant from = Instant.now().minus(Duration.ofHours(3));
+        Instant inside = from.plusSeconds(60);
+        Instant to = inside.plusSeconds(60);
+        insertTemperaturePair(from, 20, 22);
+        insertTemperaturePair(inside, 24, 26);
+        insertTemperaturePair(to, 28, 30);
+
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+                "/api/v1/systems/thermal-control/indicators/temperature/measurements"
+                        + "?from={from}&to={to}",
+                JsonNode.class,
+                from.toString(),
+                to.toString()
+        );
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode measurements = response.getBody().path("measurements");
+        assertThat(measurements).hasSize(2);
+        assertThat(measurements.get(0).path("measuredAt").asText())
+                .isEqualTo(from.toString());
+        assertThat(measurements.get(1).path("measuredAt").asText())
+                .isEqualTo(inside.toString());
     }
 
     @ParameterizedTest
@@ -518,5 +609,23 @@ class AstroMateApplicationTest {
 
     private void recordMeasurement(String metricKey, double value) {
         measurementService.recordMeasurement(metricKey, value, Instant.now());
+    }
+
+    private void insertTemperaturePair(Instant measuredAt, double radiatorA, double radiatorB) {
+        insertHistory("radiatorATemperature", radiatorA, measuredAt);
+        insertHistory("radiatorBTemperature", radiatorB, measuredAt);
+    }
+
+    private void insertHistory(String metricKey, double value, Instant measuredAt) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO measurement_history (metric_key, value, unit, measured_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                metricKey,
+                value,
+                MetricStatusEvaluator.ruleFor(metricKey).unit(),
+                measuredAt.toString()
+        );
     }
 }

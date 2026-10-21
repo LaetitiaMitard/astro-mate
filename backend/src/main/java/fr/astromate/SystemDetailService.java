@@ -200,7 +200,7 @@ class SystemDetailService {
         );
     }
 
-    private static String systemName(String systemId) {
+    static String systemName(String systemId) {
         return SYSTEMS.stream()
                 .filter(system -> system.id().equals(systemId))
                 .map(SystemMetadata::name)

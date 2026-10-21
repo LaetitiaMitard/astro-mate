@@ -117,6 +117,61 @@ class AstroMateApplicationTest {
     }
 
     @Test
+    void servesRecentEventsInPagesOfTwentyNewestFirst() {
+        Instant now = Instant.now();
+        for (int index = 0; index < 22; index++) {
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO station_event
+                        (id, system_id, level, category, source, message, occurred_at)
+                    VALUES (?, 'thermal-control', 'INFO', 'OPERATION', 'test', ?, ?)
+                    """,
+                    "event-" + index,
+                    "Événement " + index,
+                    now.minusSeconds(index).toString()
+            );
+        }
+        jdbcTemplate.update(
+                """
+                INSERT INTO station_event
+                    (id, system_id, level, category, source, message, occurred_at)
+                VALUES ('old-event', NULL, 'INFO', 'DATA', 'test', 'Ancien événement', ?)
+                """,
+                now.minus(Duration.ofDays(8)).toString()
+        );
+
+        ResponseEntity<JsonNode> firstPage = restTemplate.getForEntity(
+                "/api/v1/events",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> secondPage = restTemplate.getForEntity(
+                "/api/v1/events?page=1",
+                JsonNode.class
+        );
+
+        assertThat(firstPage.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode firstPageBody = firstPage.getBody();
+        assertThat(firstPageBody).isNotNull();
+        assertThat(firstPageBody.path("content")).hasSize(20);
+        assertThat(firstPageBody.path("content").get(0).path("id").asText())
+                .isEqualTo("event-0");
+        assertThat(firstPageBody.path("content").get(19).path("id").asText())
+                .isEqualTo("event-19");
+        assertThat(firstPageBody.path("page").asInt()).isZero();
+        assertThat(firstPageBody.path("size").asInt()).isEqualTo(20);
+        assertThat(firstPageBody.path("totalElements").asInt()).isEqualTo(22);
+        assertThat(firstPageBody.path("totalPages").asInt()).isEqualTo(2);
+
+        JsonNode secondPageBody = secondPage.getBody();
+        assertThat(secondPageBody).isNotNull();
+        assertThat(secondPageBody.path("content")).hasSize(2);
+        assertThat(secondPageBody.path("content").get(0).path("id").asText())
+                .isEqualTo("event-20");
+        assertThat(secondPageBody.path("page").asInt()).isEqualTo(1);
+        assertThat(secondPageBody.path("totalElements").asInt()).isEqualTo(22);
+    }
+
+    @Test
     void publishesMeasurementChangesAfterTheDatabaseTransactionCommits() throws Exception {
         SseEmitter subscriber = mock(SseEmitter.class);
         measurementChangeNotifier.subscribe(subscriber);

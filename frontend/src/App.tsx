@@ -11,6 +11,7 @@ import {
   formatRange,
   formatValue,
 } from "./dashboardFormat";
+import EventLog from "./EventLog";
 import ThermalSystemDetail from "./ThermalSystemDetail";
 
 const statusLabels: Record<Dashboard["stationStatus"], string> = {
@@ -115,6 +116,7 @@ export default function App() {
   const [detailLoadState, setDetailLoadState] = useState<
     "loading" | "loaded" | "error"
   >("loading");
+  const isEventLogRoute = pathname === "/events";
   const selectedSystemId = pathname.match(/^\/systems\/([^/]+)\/?$/)?.[1];
   const selectedSystem = systems.find(
     (system) => system.id === selectedSystemId,
@@ -146,6 +148,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (isEventLogRoute) {
+      return;
+    }
+
     const controller = new AbortController();
 
     getDashboard(controller.signal)
@@ -160,7 +166,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [refreshVersion]);
+  }, [isEventLogRoute, refreshVersion]);
 
   useEffect(() => {
     if (selectedSystemId !== "thermal-control") {
@@ -232,15 +238,20 @@ export default function App() {
         <a href="/systems" onClick={navigate}>
           Systèmes
         </a>
+        <a href="/events" onClick={navigate}>
+          Journal
+        </a>
       </nav>
 
-      {loadState === "loading" && (
+      {isEventLogRoute && <EventLog />}
+
+      {!isEventLogRoute && loadState === "loading" && (
         <p className="loading" role="status">
           Lecture de la simulation…
         </p>
       )}
 
-      {loadState === "error" && (
+      {!isEventLogRoute && loadState === "error" && (
         <section className="error-panel" role="alert">
           <p className="eyebrow">LECTURE IMPOSSIBLE</p>
           <h2>Tableau de bord indisponible</h2>
@@ -251,7 +262,7 @@ export default function App() {
         </section>
       )}
 
-      {loadState === "loaded" && dashboard && (
+      {!isEventLogRoute && loadState === "loaded" && dashboard && (
         isSystemRoute ? (
           selectedSystem ? (
             selectedSystem.id === "thermal-control" ? (

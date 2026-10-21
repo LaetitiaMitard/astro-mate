@@ -14,17 +14,20 @@ class DashboardController {
     private final DashboardService dashboardService;
     private final SystemDetailService systemDetailService;
     private final MeasurementHistoryService measurementHistoryService;
+    private final EventLogService eventLogService;
     private final MeasurementChangeNotifier measurementChangeNotifier;
 
     DashboardController(
             DashboardService dashboardService,
             SystemDetailService systemDetailService,
             MeasurementHistoryService measurementHistoryService,
+            EventLogService eventLogService,
             MeasurementChangeNotifier measurementChangeNotifier
     ) {
         this.dashboardService = dashboardService;
         this.systemDetailService = systemDetailService;
         this.measurementHistoryService = measurementHistoryService;
+        this.eventLogService = eventLogService;
         this.measurementChangeNotifier = measurementChangeNotifier;
     }
 
@@ -51,6 +54,13 @@ class DashboardController {
                 from,
                 to
         );
+    }
+
+    @GetMapping("/events")
+    EventLogResponse getEvents(
+            @RequestParam(defaultValue = "0") int page
+    ) {
+        return eventLogService.getEvents(page);
     }
 
     @GetMapping(value = "/telemetry/changes", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

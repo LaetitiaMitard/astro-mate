@@ -74,6 +74,25 @@ export interface MeasurementSeries {
   }[];
 }
 
+export interface TechnicalEvent {
+  id: string;
+  level: "INFO" | "WARNING" | "CRITICAL";
+  category: "SYSTEM" | "ALERT" | "MAINTENANCE" | "OPERATION" | "DATA";
+  systemId: string | null;
+  systemName: string | null;
+  source: string | null;
+  message: string;
+  occurredAt: string;
+}
+
+export interface EventLogPage {
+  content: TechnicalEvent[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export interface Dashboard {
   stationStatus: SystemStatus;
   offlineSystems: string[];
@@ -222,6 +241,47 @@ function isEvent(value: unknown): value is SystemDetail["recentEvents"][number] 
   );
 }
 
+function isTechnicalEvent(value: unknown): value is TechnicalEvent {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    isOneOf(value.level, ["INFO", "WARNING", "CRITICAL"]) &&
+    isOneOf(value.category, [
+      "SYSTEM",
+      "ALERT",
+      "MAINTENANCE",
+      "OPERATION",
+      "DATA",
+    ]) &&
+    (typeof value.systemId === "string" || value.systemId === null) &&
+    (typeof value.systemName === "string" || value.systemName === null) &&
+    (typeof value.source === "string" || value.source === null) &&
+    typeof value.message === "string" &&
+    typeof value.occurredAt === "string" &&
+    Number.isFinite(Date.parse(value.occurredAt))
+  );
+}
+
+function isEventLogPage(value: unknown): value is EventLogPage {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.content) &&
+    value.content.length <= 20 &&
+    value.content.every(isTechnicalEvent) &&
+    typeof value.page === "number" &&
+    Number.isInteger(value.page) &&
+    value.page >= 0 &&
+    typeof value.size === "number" &&
+    value.size === 20 &&
+    typeof value.totalElements === "number" &&
+    Number.isInteger(value.totalElements) &&
+    value.totalElements >= 0 &&
+    typeof value.totalPages === "number" &&
+    Number.isInteger(value.totalPages) &&
+    value.totalPages === Math.ceil(value.totalElements / 20)
+  );
+}
+
 function isSystemDetail(value: unknown): value is SystemDetail {
   return (
     isRecord(value) &&
@@ -305,6 +365,24 @@ export async function getDashboard(signal: AbortSignal): Promise<Dashboard> {
   const payload: unknown = await response.json();
   if (!isDashboard(payload)) {
     throw new Error("Dashboard response is invalid");
+  }
+
+  return payload;
+}
+
+export async function getEvents(
+  page: number,
+  signal: AbortSignal,
+): Promise<EventLogPage> {
+  const response = await fetch(`/api/v1/events?page=${page}`, { signal });
+
+  if (!response.ok) {
+    throw new Error(`Event log request failed with status ${response.status}`);
+  }
+
+  const payload: unknown = await response.json();
+  if (!isEventLogPage(payload) || payload.page !== page) {
+    throw new Error("Event log response is invalid");
   }
 
   return payload;

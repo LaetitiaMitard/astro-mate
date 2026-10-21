@@ -15,12 +15,14 @@ indicateurs simulés, de repérer des anomalies et de consulter leur historique.
 - Suivi du support de vie, du contrôle thermique, de l’alimentation électrique
   et des communications.
 - Détail du système thermique, de ses composants et de ses mesures historiques.
-- Consultation des alertes et recherche filtrée dans le journal d’événements.
+- Journal chronologique des événements techniques des sept derniers jours,
+  consultable par pages de 20 événements.
 - Simulation locale périodique et persistance de l’historique.
 
 Le socle local comprend le tableau de bord, la liste des systèmes et le calcul
-des états des métriques selon les seuils configurés. Les autres vues et
-capacités décrites dans les spécifications restent à implémenter.
+des états des métriques selon les seuils configurés, ainsi que le détail
+thermique et le journal chronologique. Les autres vues et capacités décrites
+dans les spécifications restent à implémenter.
 
 ## Scénario thermique
 

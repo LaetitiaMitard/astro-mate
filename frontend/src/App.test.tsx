@@ -276,6 +276,130 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByText("Aucune alerte ouverte")).toBeInTheDocument();
   });
 
+  it("shows recent technical events and navigates between pages", async () => {
+    const eventLogPage = (page: number) => ({
+      content: [
+        {
+          id: `event-${page}`,
+          level: "WARNING",
+          category: "DATA",
+          systemId: "thermal-control",
+          systemName: "Contrôle thermique",
+          source: "simulation",
+          message: `Événement page ${page + 1}`,
+          occurredAt: "2026-10-21T12:00:00Z",
+        },
+      ],
+      page,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const payload = url.startsWith("/api/v1/events")
+        ? eventLogPage(Number(new URL(url, window.location.origin).searchParams.get("page")))
+        : dashboard;
+      return Promise.resolve(
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("link", { name: "Journal" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Journal chronologique" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Événement page 1")).toBeInTheDocument();
+    expect(screen.getByText("Contrôle thermique")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Pagination du journal" }),
+    ).toHaveTextContent(/Page\s+1\s+sur\s+2/);
+    expect(screen.getByRole("button", { name: "Précédent" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Suivant" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: /export/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Suivant" }));
+
+    expect(await screen.findByText("Événement page 2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Pagination du journal" }),
+    ).toHaveTextContent(/Page\s+2\s+sur\s+2/);
+    expect(screen.getByRole("button", { name: "Précédent" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Suivant" })).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/events?page=1",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it("announces event loading and an empty journal", async () => {
+    window.history.replaceState(null, "", "/events");
+    let resolveEvents: ((response: Response) => void) | undefined;
+    const pendingResponse = new Promise<Response>((resolve) => {
+      resolveEvents = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(pendingResponse));
+
+    render(<App />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Lecture du journal technique",
+    );
+    await act(async () => {
+      resolveEvents?.(
+        new Response(
+          JSON.stringify({
+            content: [],
+            page: 0,
+            size: 20,
+            totalElements: 0,
+            totalPages: 0,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    });
+
+    expect(
+      await screen.findByText(
+        "Aucun événement technique au cours des sept derniers jours.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Pagination du journal" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("shows an explicit message when the event API fails", async () => {
+    window.history.replaceState(null, "", "/events");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ title: "Service indisponible" }), {
+          status: 503,
+          headers: { "Content-Type": "application/problem+json" },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Journal technique indisponible",
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   it("refreshes the dashboard when the server reports a measurement change", async () => {
     vi.stubGlobal("EventSource", TestEventSource);
     const changedDashboard = {

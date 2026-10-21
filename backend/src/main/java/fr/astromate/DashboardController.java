@@ -58,9 +58,25 @@ class DashboardController {
 
     @GetMapping("/events")
     EventLogResponse getEvents(
-            @RequestParam(defaultValue = "0") int page
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "occurredAt,desc") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize
     ) {
-        return eventLogService.getEvents(page);
+        return eventLogService.getEvents(
+                page,
+                pageSize,
+                from,
+                to,
+                level,
+                category,
+                q,
+                sort
+        );
     }
 
     @GetMapping(value = "/telemetry/changes", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

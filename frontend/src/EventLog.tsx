@@ -57,13 +57,13 @@ export default function EventLog() {
         </section>
       )}
 
-      {loadState === "loaded" && result && result.content.length === 0 && (
+      {loadState === "loaded" && result && result.items.length === 0 && (
         <p className="event-log-empty">
           Aucun événement technique au cours des sept derniers jours.
         </p>
       )}
 
-      {loadState === "loaded" && result && result.content.length > 0 && (
+      {loadState === "loaded" && result && result.items.length > 0 && (
         <>
           <div className="event-log-table-scroll">
             <table
@@ -80,7 +80,7 @@ export default function EventLog() {
                 </tr>
               </thead>
               <tbody>
-                {result.content.map((event) => (
+                {result.items.map((event) => (
                   <tr key={event.id}>
                     <td>{formatMeasurementDate(event.occurredAt)}</td>
                     <td>{event.level}</td>

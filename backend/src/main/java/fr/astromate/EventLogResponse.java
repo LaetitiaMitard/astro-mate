@@ -3,9 +3,9 @@ package fr.astromate;
 import java.util.List;
 
 public record EventLogResponse(
-        List<SystemDetailResponse.Event> content,
+        List<SystemDetailResponse.Event> items,
         int page,
-        int size,
+        int pageSize,
         long totalElements,
         int totalPages
 ) {

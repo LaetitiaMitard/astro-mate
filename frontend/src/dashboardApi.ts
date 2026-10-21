@@ -86,9 +86,9 @@ export interface TechnicalEvent {
 }
 
 export interface EventLogPage {
-  content: TechnicalEvent[];
+  items: TechnicalEvent[];
   page: number;
-  size: number;
+  pageSize: number;
   totalElements: number;
   totalPages: number;
 }
@@ -265,20 +265,23 @@ function isTechnicalEvent(value: unknown): value is TechnicalEvent {
 function isEventLogPage(value: unknown): value is EventLogPage {
   return (
     isRecord(value) &&
-    Array.isArray(value.content) &&
-    value.content.length <= 20 &&
-    value.content.every(isTechnicalEvent) &&
+    Array.isArray(value.items) &&
+    value.items.length <= 100 &&
+    value.items.every(isTechnicalEvent) &&
     typeof value.page === "number" &&
     Number.isInteger(value.page) &&
     value.page >= 0 &&
-    typeof value.size === "number" &&
-    value.size === 20 &&
+    typeof value.pageSize === "number" &&
+    Number.isInteger(value.pageSize) &&
+    value.pageSize >= 1 &&
+    value.pageSize <= 100 &&
+    value.items.length <= value.pageSize &&
     typeof value.totalElements === "number" &&
     Number.isInteger(value.totalElements) &&
     value.totalElements >= 0 &&
     typeof value.totalPages === "number" &&
     Number.isInteger(value.totalPages) &&
-    value.totalPages === Math.ceil(value.totalElements / 20)
+    value.totalPages === Math.ceil(value.totalElements / value.pageSize)
   );
 }
 

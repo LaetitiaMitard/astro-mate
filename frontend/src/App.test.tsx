@@ -278,7 +278,7 @@ describe("AstroMate dashboard", () => {
 
   it("shows recent technical events and navigates between pages", async () => {
     const eventLogPage = (page: number) => ({
-      content: [
+      items: [
         {
           id: `event-${page}`,
           level: "WARNING",
@@ -291,7 +291,7 @@ describe("AstroMate dashboard", () => {
         },
       ],
       page,
-      size: 20,
+      pageSize: 20,
       totalElements: 21,
       totalPages: 2,
     });
@@ -357,9 +357,9 @@ describe("AstroMate dashboard", () => {
       resolveEvents?.(
         new Response(
           JSON.stringify({
-            content: [],
+            items: [],
             page: 0,
-            size: 20,
+            pageSize: 20,
             totalElements: 0,
             totalPages: 0,
           }),

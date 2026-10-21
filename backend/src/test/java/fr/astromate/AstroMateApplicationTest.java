@@ -148,27 +148,53 @@ class AstroMateApplicationTest {
                 "/api/v1/events?page=1",
                 JsonNode.class
         );
+        ResponseEntity<JsonNode> oldestFirst = restTemplate.getForEntity(
+                "/api/v1/events?pageSize=2&sort=occurredAt,asc",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> filtered = restTemplate.getForEntity(
+                "/api/v1/events?level=INFO&category=OPERATION&q=Événement 21",
+                JsonNode.class
+        );
 
         assertThat(firstPage.getStatusCode().is2xxSuccessful()).isTrue();
         JsonNode firstPageBody = firstPage.getBody();
         assertThat(firstPageBody).isNotNull();
-        assertThat(firstPageBody.path("content")).hasSize(20);
-        assertThat(firstPageBody.path("content").get(0).path("id").asText())
+        assertThat(firstPageBody.path("items")).hasSize(20);
+        assertThat(firstPageBody.path("items").get(0).path("id").asText())
                 .isEqualTo("event-0");
-        assertThat(firstPageBody.path("content").get(19).path("id").asText())
+        assertThat(firstPageBody.path("items").get(19).path("id").asText())
                 .isEqualTo("event-19");
         assertThat(firstPageBody.path("page").asInt()).isZero();
-        assertThat(firstPageBody.path("size").asInt()).isEqualTo(20);
+        assertThat(firstPageBody.path("pageSize").asInt()).isEqualTo(20);
         assertThat(firstPageBody.path("totalElements").asInt()).isEqualTo(22);
         assertThat(firstPageBody.path("totalPages").asInt()).isEqualTo(2);
 
         JsonNode secondPageBody = secondPage.getBody();
         assertThat(secondPageBody).isNotNull();
-        assertThat(secondPageBody.path("content")).hasSize(2);
-        assertThat(secondPageBody.path("content").get(0).path("id").asText())
+        assertThat(secondPageBody.path("items")).hasSize(2);
+        assertThat(secondPageBody.path("items").get(0).path("id").asText())
                 .isEqualTo("event-20");
         assertThat(secondPageBody.path("page").asInt()).isEqualTo(1);
         assertThat(secondPageBody.path("totalElements").asInt()).isEqualTo(22);
+
+        JsonNode oldestFirstBody = oldestFirst.getBody();
+        assertThat(oldestFirst.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(oldestFirstBody).isNotNull();
+        assertThat(oldestFirstBody.path("items")).hasSize(2);
+        assertThat(oldestFirstBody.path("items").get(0).path("id").asText())
+                .isEqualTo("event-21");
+        assertThat(oldestFirstBody.path("items").get(1).path("id").asText())
+                .isEqualTo("event-20");
+        assertThat(oldestFirstBody.path("pageSize").asInt()).isEqualTo(2);
+
+        JsonNode filteredBody = filtered.getBody();
+        assertThat(filtered.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(filteredBody).isNotNull();
+        assertThat(filteredBody.path("items")).hasSize(1);
+        assertThat(filteredBody.path("items").get(0).path("id").asText())
+                .isEqualTo("event-21");
+        assertThat(filteredBody.path("totalElements").asInt()).isEqualTo(1);
     }
 
     @Test

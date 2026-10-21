@@ -144,6 +144,8 @@ paths:
       summary: Rechercher les alertes
       description: >-
         Sans filtre de statut, retourne les alertes ouvertes et résolues.
+        Les filtres de niveau et de système sont cumulables et s'appliquent
+        avant le calcul du total et la pagination.
         L'ordre par défaut place les alertes ouvertes en premier, puis les
         niveaux les plus élevés et les détections les plus récentes.
       parameters:
@@ -158,8 +160,10 @@ paths:
             $ref: '#/components/schemas/AlertLevel'
         - name: systemId
           in: query
+          description: Filtrer sur le système concerné.
           schema:
             type: string
+            enum: [life-support, thermal-control, power-supply, communications]
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:

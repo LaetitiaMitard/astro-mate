@@ -281,6 +281,62 @@ class AstroMateApplicationTest {
     }
 
     @Test
+    void filtersAlertsByLevelAndSystemBeforeCalculatingPageMetadata() {
+        Instant now = Instant.now();
+        insertAlert("thermal-open", "thermal-control", "WARNING", "OPEN", now.minusSeconds(1));
+        insertAlert("power-open-critical", "power-supply", "CRITICAL", "OPEN", now.minusSeconds(5));
+        insertAlert("thermal-resolved-new", "thermal-control", "WARNING", "RESOLVED", now.minusSeconds(10));
+        insertAlert("life-support-resolved", "life-support", "WARNING", "RESOLVED", now.minusSeconds(15));
+        insertAlert("thermal-resolved-old", "thermal-control", "WARNING", "RESOLVED", now.minusSeconds(20));
+        insertAlert("communications-info", "communications", "INFO", "RESOLVED", now.minusSeconds(25));
+
+        ResponseEntity<JsonNode> byLevel = restTemplate.getForEntity(
+                "/api/v1/alerts?level=WARNING&page=1&pageSize=2",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> bySystem = restTemplate.getForEntity(
+                "/api/v1/alerts?systemId=thermal-control&pageSize=2",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> byLevelAndSystem = restTemplate.getForEntity(
+                "/api/v1/alerts?level=WARNING&systemId=thermal-control&page=1&pageSize=2",
+                JsonNode.class
+        );
+
+        JsonNode levelBody = byLevel.getBody();
+        assertThat(byLevel.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(levelBody).isNotNull();
+        assertThat(levelBody.path("items")).hasSize(2);
+        assertThat(levelBody.path("items").get(0).path("id").asText())
+                .isEqualTo("life-support-resolved");
+        assertThat(levelBody.path("items").get(1).path("id").asText())
+                .isEqualTo("thermal-resolved-old");
+        assertThat(levelBody.path("page").asInt()).isEqualTo(1);
+        assertThat(levelBody.path("totalElements").asInt()).isEqualTo(4);
+        assertThat(levelBody.path("totalPages").asInt()).isEqualTo(2);
+
+        JsonNode systemBody = bySystem.getBody();
+        assertThat(bySystem.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(systemBody).isNotNull();
+        assertThat(systemBody.path("items")).hasSize(2);
+        assertThat(systemBody.path("items").get(0).path("id").asText())
+                .isEqualTo("thermal-open");
+        assertThat(systemBody.path("items").get(1).path("id").asText())
+                .isEqualTo("thermal-resolved-new");
+        assertThat(systemBody.path("totalElements").asInt()).isEqualTo(3);
+        assertThat(systemBody.path("totalPages").asInt()).isEqualTo(2);
+
+        JsonNode combinedBody = byLevelAndSystem.getBody();
+        assertThat(byLevelAndSystem.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(combinedBody).isNotNull();
+        assertThat(combinedBody.path("items")).hasSize(1);
+        assertThat(combinedBody.path("items").get(0).path("id").asText())
+                .isEqualTo("thermal-resolved-old");
+        assertThat(combinedBody.path("totalElements").asInt()).isEqualTo(3);
+        assertThat(combinedBody.path("totalPages").asInt()).isEqualTo(2);
+    }
+
+    @Test
     void publishesMeasurementChangesAfterTheDatabaseTransactionCommits() throws Exception {
         SseEmitter subscriber = mock(SseEmitter.class);
         measurementChangeNotifier.subscribe(subscriber);
@@ -791,6 +847,32 @@ class AstroMateApplicationTest {
 
     private void recordMeasurement(String metricKey, double value) {
         measurementService.recordMeasurement(metricKey, value, Instant.now());
+    }
+
+    private void insertAlert(
+            String id,
+            String systemId,
+            String level,
+            String status,
+            Instant detectedAt
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO alert_episode
+                    (id, system_id, metric_id, metric_key, level, message,
+                     status, detected_at, resolved_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                id,
+                systemId,
+                id + "-metric",
+                id + "-metric",
+                level,
+                id,
+                status,
+                detectedAt.toString(),
+                status.equals("OPEN") ? null : detectedAt.plusSeconds(30).toString()
+        );
     }
 
     private void insertTemperaturePair(Instant measuredAt, double radiatorA, double radiatorB) {

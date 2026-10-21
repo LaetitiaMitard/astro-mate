@@ -39,8 +39,12 @@ class AstroMateApplicationTest {
 
     @BeforeEach
     void resetDashboardMeasurements() {
-        jdbcTemplate.update("DELETE FROM station_event");
-        jdbcTemplate.update("DELETE FROM alert_episode");
+        jdbcTemplate.update(
+                "UPDATE metric_measurement SET measured_at = '1970-01-01T00:00:00Z'"
+        );
+        jdbcTemplate.update(
+                "UPDATE dashboard_indicator SET measured_at = '1970-01-01T00:00:00Z'"
+        );
         jdbcTemplate.update(
                 """
                 INSERT OR IGNORE INTO metric_measurement
@@ -62,6 +66,8 @@ class AstroMateApplicationTest {
         }) {
             measurementService.setSystemAvailability(systemId, "ONLINE");
         }
+        jdbcTemplate.update("DELETE FROM station_event");
+        jdbcTemplate.update("DELETE FROM alert_episode");
     }
 
     @Test
@@ -215,12 +221,13 @@ class AstroMateApplicationTest {
         assertThat(warningDashboard.path("recentOpenAlerts").get(0).path("metricId").asText())
                 .isEqualTo("radiator-a-temperature");
         JsonNode warningEvents = getThermalEvents();
-        assertThat(warningEvents).hasSize(1);
-        assertThat(warningEvents.get(0).path("level").asText()).isEqualTo("WARNING");
+        assertThat(warningEvents).hasSize(2);
+        assertThat(warningEvents.findValuesAsText("level"))
+                .containsExactlyInAnyOrder("WARNING", "WARNING");
         assertThat(warningEvents.get(0).path("category").asText()).isEqualTo("ALERT");
 
         recordMeasurement("radiatorATemperature", 27);
-        assertThat(getThermalEvents()).hasSize(1);
+        assertThat(getThermalEvents()).hasSize(2);
 
         recordMeasurement("radiatorATemperature", 31);
         JsonNode criticalDashboard = getDashboard();
@@ -228,18 +235,23 @@ class AstroMateApplicationTest {
         assertThat(criticalDashboard.path("recentOpenAlerts").get(0).path("level").asText())
                 .isEqualTo("CRITICAL");
         JsonNode criticalEvents = getThermalEvents();
-        assertThat(criticalEvents).hasSize(3);
+        assertThat(criticalEvents).hasSize(5);
         assertThat(criticalEvents.findValuesAsText("level"))
-                .containsExactlyInAnyOrder("WARNING", "INFO", "CRITICAL");
+                .containsExactlyInAnyOrder(
+                        "WARNING", "WARNING", "CRITICAL", "INFO", "CRITICAL"
+                );
 
         recordMeasurement("radiatorATemperature", 22.1);
         assertThat(getDashboard().path("recentOpenAlerts")).isEmpty();
         JsonNode resolvedEvents = getThermalEvents();
-        assertThat(resolvedEvents).hasSize(4);
-        assertThat(resolvedEvents.get(0).path("level").asText()).isEqualTo("INFO");
+        assertThat(resolvedEvents).hasSize(7);
+        assertThat(resolvedEvents.findValuesAsText("level"))
+                .containsExactlyInAnyOrder(
+                        "WARNING", "WARNING", "CRITICAL", "INFO", "CRITICAL", "INFO", "INFO"
+                );
 
         recordMeasurement("radiatorATemperature", 22.1);
-        assertThat(getThermalEvents()).hasSize(4);
+        assertThat(getThermalEvents()).hasSize(7);
     }
 
     @Test
@@ -254,7 +266,29 @@ class AstroMateApplicationTest {
         assertThat(warningDashboard.path("recentOpenAlerts").get(0).path("level").asText())
                 .isEqualTo("WARNING");
         assertThat(getThermalEvents().findValuesAsText("level"))
-                .containsExactlyInAnyOrder("CRITICAL", "INFO", "WARNING");
+                .containsExactlyInAnyOrder(
+                        "CRITICAL", "CRITICAL", "WARNING", "INFO", "WARNING"
+                );
+    }
+
+    @Test
+    void ignoresOutOfOrderMeasurementsWithoutClosingAnOpenAlert() {
+        Instant newerMeasurement = Instant.now().plusSeconds(5);
+        measurementService.recordMeasurement(
+                "radiatorATemperature",
+                31,
+                newerMeasurement
+        );
+
+        assertThatThrownBy(() -> measurementService.recordMeasurement(
+                "radiatorATemperature",
+                22.1,
+                Instant.now()
+        )).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(getDashboard().path("recentOpenAlerts").get(0).path("level").asText())
+                .isEqualTo("CRITICAL");
+        assertThat(getThermalEvents()).hasSize(2);
     }
 
     @Test

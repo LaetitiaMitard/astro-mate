@@ -58,14 +58,17 @@ class MeasurementService {
 
         List<MetricSnapshot> previousMeasurements = jdbcTemplate.query(
                 """
-                SELECT system_id, metric_id, name
+                SELECT system_id, metric_id, name, value, unit, measured_at
                 FROM metric_measurement
                 WHERE metric_key = ?
                 """,
                 (resultSet, rowNumber) -> new MetricSnapshot(
                         resultSet.getString("system_id"),
                         resultSet.getString("metric_id"),
-                        resultSet.getString("name")
+                        resultSet.getString("name"),
+                        resultSet.getDouble("value"),
+                        resultSet.getString("unit"),
+                        resultSet.getString("measured_at")
                 ),
                 metricKey
         );
@@ -73,6 +76,12 @@ class MeasurementService {
             throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
         }
         MetricSnapshot metric = previousMeasurements.get(0);
+        if (measuredAt.isBefore(Instant.parse(metric.measuredAt()))) {
+            throw new IllegalArgumentException(
+                    "Une mesure ne peut pas remplacer une mesure plus récente pour "
+                            + metricKey + "."
+            );
+        }
 
         int updated = jdbcTemplate.update(
                 """
@@ -89,10 +98,15 @@ class MeasurementService {
             throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
         }
 
+        MetricStatus nextStatus = MetricStatusEvaluator.evaluate(
+                metricKey,
+                canonicalValue
+        );
+        recordStatusTransition(metricKey, metric, nextStatus, measuredAt);
         updateAlertEpisode(
                 metricKey,
                 metric,
-                MetricStatusEvaluator.evaluate(metricKey, canonicalValue),
+                nextStatus,
                 measuredAt
         );
 
@@ -103,6 +117,47 @@ class MeasurementService {
                 || metricKey.equals("radiatorBTemperature")) {
             updateLegacyTemperatureProjection(measuredAt);
         }
+    }
+
+    private void recordStatusTransition(
+            String metricKey,
+            MetricSnapshot metric,
+            MetricStatus nextStatus,
+            Instant occurredAt
+    ) {
+        MetricStatus previousStatus = MetricStatusEvaluator.evaluate(
+                metricKey,
+                metric.value()
+        );
+        if (!MetricStatusEvaluator.ruleFor(metricKey).unit().equals(metric.unit())) {
+            previousStatus = MetricStatus.UNKNOWN;
+        }
+        if (previousStatus == nextStatus) {
+            return;
+        }
+        String level = nextStatus == MetricStatus.WARNING
+                        || nextStatus == MetricStatus.CRITICAL
+                ? nextStatus.name()
+                : "INFO";
+        String message = "État de " + metric.name() + " passé de "
+                + statusLabel(previousStatus) + " à " + statusLabel(nextStatus) + ".";
+        insertTechnicalEvent(
+                metricKey,
+                metric.systemId(),
+                level,
+                message,
+                occurredAt
+        );
+    }
+
+    private static String statusLabel(MetricStatus status) {
+        return switch (status) {
+            case NOMINAL -> "nominal";
+            case WARNING -> "avertissement";
+            case CRITICAL -> "critique";
+            case UNKNOWN -> "inconnu";
+            case OFFLINE -> "hors ligne";
+        };
     }
 
     private void updateAlertEpisode(
@@ -154,7 +209,7 @@ class MeasurementService {
         if (updated != 1) {
             throw new IllegalStateException("L’alerte ouverte a changé pendant sa résolution.");
         }
-        insertAlertEvent(
+        insertTechnicalEvent(
                 metricKey,
                 metric.systemId(),
                 "INFO",
@@ -187,7 +242,13 @@ class MeasurementService {
                 message,
                 detectedAt.toString()
         );
-        insertAlertEvent(metricKey, metric.systemId(), level.name(), message, detectedAt);
+        insertTechnicalEvent(
+                metricKey,
+                metric.systemId(),
+                level.name(),
+                message,
+                detectedAt
+        );
     }
 
     private static String alertLevelLabel(String level) {
@@ -200,7 +261,7 @@ class MeasurementService {
         };
     }
 
-    private void insertAlertEvent(
+    private void insertTechnicalEvent(
             String metricKey,
             String systemId,
             String level,
@@ -297,7 +358,10 @@ class MeasurementService {
     private record MetricSnapshot(
             String systemId,
             String metricId,
-            String name
+            String name,
+            double value,
+            String unit,
+            String measuredAt
     ) {
     }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import "./App.css";
 import {
   getDashboard,
@@ -43,6 +43,29 @@ const systems = [
     id: "communications",
     name: "Communications",
     description: "Système de communication de la station",
+  },
+] as const;
+
+const navigationItems = [
+  {
+    href: "/",
+    label: "Tableau de bord",
+    icon: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
+  },
+  {
+    href: "/systems",
+    label: "Systèmes",
+    icon: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+  },
+  {
+    href: "/alerts",
+    label: "Alertes",
+    icon: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
+  },
+  {
+    href: "/events",
+    label: "Journal",
+    icon: "M5 3h14v18H5zM9 7h6M9 11h6M9 15h4",
   },
 ] as const;
 
@@ -112,6 +135,10 @@ export default function App() {
     "loading",
   );
   const [pathname, setPathname] = useState(window.location.pathname);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const navigationRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLElement>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [systemDetail, setSystemDetail] = useState<SystemDetail | null>(null);
   const [detailLoadState, setDetailLoadState] = useState<
@@ -207,7 +234,13 @@ export default function App() {
   }, [selectedSystemId, refreshVersion]);
 
   useEffect(() => {
-    const onPopState = () => setPathname(window.location.pathname);
+    const onPopState = () => {
+      if (navigationRef.current?.contains(document.activeElement)) {
+        contentRef.current?.focus();
+      }
+      setIsMenuOpen(false);
+      setPathname(window.location.pathname);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -217,6 +250,10 @@ export default function App() {
     const nextPath = event.currentTarget.pathname;
     window.history.pushState(null, "", nextPath);
     setPathname(nextPath);
+    if (isMenuOpen) {
+      contentRef.current?.focus();
+    }
+    setIsMenuOpen(false);
   }
 
   const isSystemListRoute = pathname === "/systems";
@@ -237,28 +274,72 @@ export default function App() {
       : null;
 
   return (
-    <main className="app">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">CENTRE DE CONTRÔLE · STATION UNIQUE</p>
-          <h1>AstroMate</h1>
+    <div className="app">
+      <aside
+        className="sidebar"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && isMenuOpen) {
+            setIsMenuOpen(false);
+            menuButtonRef.current?.focus();
+          }
+        }}
+      >
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <svg className="brand-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <circle cx="24" cy="24" r="15" />
+              <ellipse cx="24" cy="24" rx="26" ry="8" transform="rotate(-40 24 24)" />
+              <path d="m18 26 9-10-2 12-9 5z" />
+            </svg>
+            <div>
+              <h1>Astro<span>Mate</span></h1>
+              <p>Centre de contrôle</p>
+            </div>
+          </div>
+          <button
+            ref={menuButtonRef}
+            className="menu-toggle"
+            type="button"
+            aria-expanded={isMenuOpen}
+            aria-controls="main-navigation"
+            onClick={() => setIsMenuOpen((open) => !open)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d={isMenuOpen ? "m6 6 12 12M6 18 18 6" : "M4 6h16M4 12h16M4 18h16"} />
+            </svg>
+            Menu
+          </button>
         </div>
+        <nav
+          ref={navigationRef}
+          id="main-navigation"
+          className={`main-navigation${isMenuOpen ? " is-open" : ""}`}
+          aria-label="Navigation principale"
+        >
+          {navigationItems.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              onClick={navigate}
+              aria-current={
+                (item.href === "/systems" ? isSystemRoute : pathname === item.href)
+                  ? "page"
+                  : undefined
+              }
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d={item.icon} />
+              </svg>
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      </aside>
+      <main className="app-content" ref={contentRef} tabIndex={-1}>
+      <header className="page-header">
+        <p className="eyebrow">CENTRE DE CONTRÔLE · STATION UNIQUE</p>
         <p className="notice">Simulation — données fictives, non opérationnelles</p>
       </header>
-      <nav className="main-navigation" aria-label="Navigation principale">
-        <a href="/" onClick={navigate}>
-          Tableau de bord
-        </a>
-        <a href="/systems" onClick={navigate}>
-          Systèmes
-        </a>
-        <a href="/alerts" onClick={navigate}>
-          Alertes
-        </a>
-        <a href="/events" onClick={navigate}>
-          Journal
-        </a>
-      </nav>
 
       {isEventLogRoute && <EventLog refreshVersion={refreshVersion} />}
       {isAlertLogRoute && <AlertLog refreshVersion={refreshVersion} />}
@@ -541,6 +622,7 @@ export default function App() {
           </>
         )
       )}
-    </main>
+      </main>
+    </div>
   );
 }

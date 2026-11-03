@@ -23,6 +23,11 @@ La V1 comprend le tableau de bord, les quatre systèmes, le détail thermique et
 son historique, ainsi que les vues complètes des alertes et du journal. Les
 données, le scénario thermique et la persistance restent entièrement locaux.
 
+La navigation commune se trouve dans une barre latérale : tableau de bord,
+systèmes, alertes et journal. La rubrique courante est mise en évidence, y compris
+sur les détails d’un système. Sur petit écran, le bouton « Menu » déplie cette
+navigation ; choisir une destination ou appuyer sur Échap la referme.
+
 ## Scénario thermique
 
 La simulation démarre automatiquement avec le backend et produit une télémétrie

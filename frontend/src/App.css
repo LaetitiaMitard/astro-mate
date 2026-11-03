@@ -7,7 +7,7 @@
 }
 
 body {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100vh;
   margin: 0;
   background:
@@ -16,10 +16,68 @@ body {
 }
 
 .app {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.app-content {
   box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 3.5rem 2.5rem 5rem;
+  padding: 2.5rem 2rem 5rem;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  box-sizing: border-box;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  border-right: 1px solid #263242;
+  background: linear-gradient(160deg, #172638, #111c2c);
+}
+
+.sidebar-header {
+  padding: 2rem 1.25rem;
+  border-bottom: 1px solid #263242;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.sidebar-brand h1 {
+  font-size: 1.65rem;
+  letter-spacing: -0.04em;
+}
+
+.sidebar-brand h1 span {
+  color: #8fb9ff;
+}
+
+.sidebar-brand p {
+  margin: 0.4rem 0 0;
+  color: #a6b8cf;
+  font-size: 0.8rem;
+}
+
+.brand-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  overflow: visible;
+  stroke: #8fb9ff;
+  stroke-width: 2;
+}
+
+.menu-toggle {
+  display: none;
 }
 
 .page-header,
@@ -38,11 +96,48 @@ body {
   border-bottom: 1px solid #263242;
 }
 
+.page-header .eyebrow {
+  margin: 0;
+}
+
 .main-navigation {
   display: flex;
-  gap: 1.4rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid #263242;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.25rem 0.75rem 1.25rem 0;
+}
+
+.main-navigation a {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.4rem;
+  box-sizing: border-box;
+  padding: 0.8rem 1.25rem;
+  border-left: 4px solid transparent;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.main-navigation a svg,
+.menu-toggle svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.main-navigation a[aria-current="page"] {
+  border-left-color: #8fb9ff;
+  background: #243f63;
+  color: #f0f6ff;
+}
+
+.main-navigation a:hover {
+  background: #20344e;
+  color: #e8f3ff;
 }
 
 .main-navigation a,
@@ -53,13 +148,13 @@ body {
   text-decoration: none;
 }
 
-.main-navigation a:hover,
 .back-link:hover {
   color: #e8f3ff;
   text-decoration: underline;
 }
 
-a:focus-visible {
+a:focus-visible,
+.menu-toggle:focus-visible {
   border-radius: 0.2rem;
   outline: 2px solid #8fc8ff;
   outline-offset: 4px;
@@ -99,6 +194,7 @@ h1 {
 }
 
 .station-summary {
+  flex-wrap: wrap;
   gap: 2rem;
   margin: 2rem 0 3.25rem;
   padding: 1.25rem 1.5rem;
@@ -659,6 +755,7 @@ h1 {
 
 .indicator-card-heading {
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .indicator-card h3 {
@@ -945,8 +1042,74 @@ h1 {
   cursor: not-allowed;
 }
 
-@media (max-width: 650px) {
+@media (max-width: 1100px) {
+  .thermal-component {
+    grid-template-columns: 1fr auto;
+  }
+
+  .thermal-component-updated {
+    text-align: left;
+  }
+}
+
+@media (max-width: 900px) {
   .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    overflow-y: visible;
+    border-right: 0;
+    border-bottom: 1px solid #263242;
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border-bottom: 0;
+  }
+
+  .sidebar-brand h1 {
+    font-size: 1.35rem;
+  }
+
+  .brand-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem;
+    border: 1px solid #38506c;
+    border-radius: 0.45rem;
+    background: #172637;
+    color: #d8e8ff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+  }
+
+  .main-navigation {
+    display: none;
+    padding-top: 0;
+  }
+
+  .main-navigation.is-open {
+    display: flex;
+  }
+}
+
+@media (max-width: 650px) {
+  .app-content {
     padding: 2rem 1rem 3rem;
   }
 
@@ -999,14 +1162,6 @@ h1 {
 
   .thermal-metric-grid {
     grid-template-columns: 1fr;
-  }
-
-  .thermal-component {
-    grid-template-columns: 1fr auto;
-  }
-
-  .thermal-component-updated {
-    text-align: left;
   }
 
   .event-log-pagination {

@@ -244,6 +244,96 @@ afterEach(() => {
 });
 
 describe("AstroMate dashboard", () => {
+  it.each([
+    ["/", "Tableau de bord"],
+    ["/systems", "Systèmes"],
+    ["/systems/thermal-control", "Systèmes"],
+    ["/systems/life-support", "Systèmes"],
+    ["/systems/communications/", "Systèmes"],
+    ["/alerts", "Alertes"],
+    ["/events", "Journal"],
+  ])("marks the current sidebar destination on direct access to %s", async (path, label) => {
+    window.history.replaceState(null, "", path);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    render(<App />);
+
+    const navigation = screen.getByRole("navigation", { name: "Navigation principale" });
+    const links = within(navigation).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/", "/systems", "/alerts", "/events",
+    ]);
+    expect(within(navigation).getByRole("link", { name: label }))
+      .toHaveAttribute("aria-current", "page");
+    expect(links.filter((link) => link.hasAttribute("aria-current"))).toHaveLength(1);
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Simulation indisponible");
+    expect(screen.getByText("Simulation — données fictives, non opérationnelles"))
+      .toBeInTheDocument();
+  });
+
+  it("toggles the collapsible navigation and closes it with Escape", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<App />);
+    await screen.findByRole("alert");
+
+    const button = screen.getByRole("button", { name: "Menu" });
+    const navigation = screen.getByRole("navigation", { name: "Navigation principale" });
+    expect(button).toHaveAttribute("aria-controls", navigation.id);
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(navigation).not.toHaveClass("is-open");
+
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(navigation).toHaveClass("is-open");
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(navigation).not.toHaveClass("is-open");
+
+    fireEvent.click(button);
+    const link = within(navigation).getByRole("link", { name: "Systèmes" });
+    link.focus();
+    fireEvent.keyDown(link, { key: "Escape" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(navigation).not.toHaveClass("is-open");
+    expect(button).toHaveFocus();
+  });
+
+  it("closes the menu and updates the active destination after navigation", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<App />);
+    await screen.findByRole("alert");
+
+    const button = screen.getByRole("button", { name: "Menu" });
+    const navigation = screen.getByRole("navigation", { name: "Navigation principale" });
+    fireEvent.click(button);
+    fireEvent.click(within(navigation).getByRole("link", { name: "Systèmes" }));
+
+    expect(window.location.pathname).toBe("/systems");
+    expect(within(navigation).getByRole("link", { name: "Systèmes" }))
+      .toHaveAttribute("aria-current", "page");
+    expect(within(navigation).getByRole("link", { name: "Tableau de bord" }))
+      .not.toHaveAttribute("aria-current");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(navigation).not.toHaveClass("is-open");
+    expect(screen.getByRole("main")).toHaveFocus();
+
+    fireEvent.click(button);
+    within(navigation).getByRole("link", { name: "Journal" }).focus();
+    act(() => {
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(within(navigation).getByRole("link", { name: "Tableau de bord" }))
+      .toHaveAttribute("aria-current", "page");
+    expect(within(navigation).getByRole("link", { name: "Systèmes" }))
+      .not.toHaveAttribute("aria-current");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(navigation).not.toHaveClass("is-open");
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
   it("reports an unresponsive API even while the live connection repeatedly retries", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("EventSource", TestEventSource);

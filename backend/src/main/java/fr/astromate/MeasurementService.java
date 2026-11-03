@@ -2,7 +2,6 @@ package fr.astromate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -135,14 +134,6 @@ class MeasurementService {
                 MetricStatusEvaluator.ruleFor(metricKey).unit(),
                 measuredAt.toString()
         );
-        jdbcTemplate.update(
-                """
-                DELETE FROM measurement_history
-                WHERE julianday(measured_at) < julianday(?)
-                """,
-                Instant.now().minus(Duration.ofHours(6)).toString()
-        );
-
         MetricStatus nextStatus = MetricStatusEvaluator.evaluate(
                 metricKey,
                 canonicalValue

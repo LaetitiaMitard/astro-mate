@@ -1,4 +1,9 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import {
   getIndicatorMeasurements,
   type MeasurementSeries,
@@ -19,6 +24,7 @@ const statusLabels: Record<SystemDetail["status"], string> = {
 };
 
 type ThermalTab = "overview" | "components" | "history";
+const thermalTabs: ThermalTab[] = ["overview", "components", "history"];
 
 function chartPoints(measurements: MeasurementSeries["measurements"]) {
   const values = measurements.map((measurement) => measurement.value);
@@ -77,6 +83,32 @@ export default function ThermalSystemDetail({
     "loading" | "loaded" | "error"
   >("loading");
 
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentTab: ThermalTab,
+  ) {
+    const currentIndex = thermalTabs.indexOf(currentTab);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % thermalTabs.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex + thermalTabs.length - 1) % thermalTabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = thermalTabs.length - 1;
+    }
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextTab = thermalTabs[nextIndex];
+    setActiveTab(nextTab);
+    document.getElementById(`thermal-tab-${nextTab}`)?.focus();
+  }
+
   useEffect(() => {
     const controller = new AbortController();
     getIndicatorMeasurements(
@@ -129,7 +161,9 @@ export default function ThermalSystemDetail({
           role="tab"
           aria-selected={activeTab === "overview"}
           aria-controls="thermal-tab-panel"
+          tabIndex={activeTab === "overview" ? 0 : -1}
           onClick={() => setActiveTab("overview")}
+          onKeyDown={(event) => handleTabKeyDown(event, "overview")}
         >
           Vue d’ensemble
         </button>
@@ -139,7 +173,9 @@ export default function ThermalSystemDetail({
           role="tab"
           aria-selected={activeTab === "components"}
           aria-controls="thermal-tab-panel"
+          tabIndex={activeTab === "components" ? 0 : -1}
           onClick={() => setActiveTab("components")}
+          onKeyDown={(event) => handleTabKeyDown(event, "components")}
         >
           Composants
         </button>
@@ -149,7 +185,9 @@ export default function ThermalSystemDetail({
           role="tab"
           aria-selected={activeTab === "history"}
           aria-controls="thermal-tab-panel"
+          tabIndex={activeTab === "history" ? 0 : -1}
           onClick={() => setActiveTab("history")}
+          onKeyDown={(event) => handleTabKeyDown(event, "history")}
         >
           Historique
         </button>

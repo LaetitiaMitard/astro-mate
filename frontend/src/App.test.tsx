@@ -367,6 +367,12 @@ describe("AstroMate dashboard", () => {
     });
     expect(within(stationSummary).getByText("NOMINAL")).toBeInTheDocument();
     expect(screen.getByText("Simulation active")).toBeInTheDocument();
+    const lastMeasurement = within(stationSummary).getByText(/20\/10\/2026/);
+    expect(lastMeasurement.tagName).toBe("TIME");
+    expect(lastMeasurement).toHaveAttribute(
+      "datetime",
+      "2026-10-20T12:00:00Z",
+    );
     expect(screen.getByRole("heading", { name: "O₂" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "CO₂" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Température" })).toBeInTheDocument();
@@ -455,7 +461,9 @@ describe("AstroMate dashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("link", { name: "Alertes" }));
+    fireEvent.click(
+      await screen.findByRole("link", { name: "Consulter toutes les alertes" }),
+    );
 
     expect(
       await screen.findByRole("heading", { name: "Alertes de la station" }),
@@ -1005,6 +1013,15 @@ describe("AstroMate dashboard", () => {
     expect(
       await screen.findByRole("heading", { name: "Contrôle thermique" }),
     ).toBeInTheDocument();
+    const overviewTab = screen.getByRole("tab", { name: "Vue d’ensemble" });
+    overviewTab.focus();
+    fireEvent.keyDown(overviewTab, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Composants" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Composants" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(overviewTab).toHaveAttribute("tabindex", "-1");
     fireEvent.click(screen.getByRole("tab", { name: "Composants" }));
 
     expect(screen.getByText("Radiateur A")).toBeInTheDocument();

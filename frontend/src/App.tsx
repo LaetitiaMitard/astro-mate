@@ -454,6 +454,16 @@ export default function App() {
                   ? "Simulation en pause"
                   : "Simulation indisponible"}
             </div>
+            <p className="system-card-measurement">
+              Dernière mesure valide :{" "}
+              {dashboard.lastMeasurementAt === null ? (
+                formatMeasurementDate(null)
+              ) : (
+                <time dateTime={dashboard.lastMeasurementAt}>
+                  {formatMeasurementDate(dashboard.lastMeasurementAt)}
+                </time>
+              )}
+            </p>
           </section>
 
           <section className="indicators-section">
@@ -524,6 +534,9 @@ export default function App() {
             <span className="alert-count">
               {dashboard.recentOpenAlerts.length.toString().padStart(2, "0")}
             </span>
+            <a className="back-link" href="/alerts" onClick={navigate}>
+              Consulter toutes les alertes
+            </a>
           </section>
           </>
         )

@@ -19,10 +19,9 @@ indicateurs simulés, de repérer des anomalies et de consulter leur historique.
   consultable par pages de 20 événements.
 - Simulation locale périodique et persistance de l’historique.
 
-Le socle local comprend le tableau de bord, la liste des systèmes et le calcul
-des états des métriques selon les seuils configurés, ainsi que le détail
-thermique et le journal chronologique. Les autres vues et capacités décrites
-dans les spécifications restent à implémenter.
+La V1 comprend le tableau de bord, les quatre systèmes, le détail thermique et
+son historique, ainsi que les vues complètes des alertes et du journal. Les
+données, le scénario thermique et la persistance restent entièrement locaux.
 
 ## Scénario thermique
 
@@ -139,10 +138,12 @@ produit le JAR exécutable :
 ./mvnw verify
 ```
 
-Les tests d’intégration couvrent le calcul des seuils, l’agrégation des états,
-les domaines physiques et l’agrégation des températures des radiateurs. Le
-frontend vérifie aussi la présentation des états d’alerte et des systèmes hors
-ligne.
+Les tests couvrent les bornes et unités, les états agrégés, les mesures
+invalides ou périmées, les cycles d’alertes, la rétention, l’initialisation et
+la reprise du scénario, ainsi que les filtres et la pagination de l’API. Les
+tests frontend vérifient les principaux parcours, les états d’indisponibilité,
+la navigation clavier des onglets thermiques et l’alternative tabulaire du
+graphique.
 
 Pour lancer l’application empaquetée avec le frontend servi par Spring Boot :
 

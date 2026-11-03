@@ -117,6 +117,10 @@ h1 {
   margin-bottom: 0.45rem;
 }
 
+.station-summary .system-card-measurement {
+  margin: 0;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
@@ -711,6 +715,7 @@ h1 {
 }
 
 .alerts-panel {
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 1rem;
   padding: 1.25rem 1.5rem;
@@ -958,6 +963,14 @@ h1 {
     gap: 1rem;
     margin: 1.5rem 0 2.5rem;
     padding: 1.1rem 1.2rem;
+  }
+
+  .alerts-panel {
+    align-items: flex-start;
+  }
+
+  .alerts-panel .back-link {
+    margin-left: auto;
   }
 
   .indicator-grid {

@@ -119,6 +119,36 @@ class AstroMateApplicationTest {
     }
 
     @Test
+    void servesCanonicalSystemSummariesWithAvailabilityAndLatestMeasurement() {
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+                "/api/v1/systems",
+                JsonNode.class
+        );
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode systems = response.getBody();
+        assertThat(systems).isNotNull();
+        assertThat(systems).hasSize(4);
+        assertThat(systems.findValuesAsText("id")).containsExactly(
+                "life-support",
+                "thermal-control",
+                "power-supply",
+                "communications"
+        );
+
+        JsonNode lifeSupport = findById(systems, "life-support");
+        assertThat(lifeSupport.path("name").asText()).isEqualTo("Support de vie");
+        assertThat(lifeSupport.path("status").asText()).isEqualTo("NOMINAL");
+        assertThat(lifeSupport.path("availability").asText()).isEqualTo("ONLINE");
+        assertThat(Instant.parse(lifeSupport.path("updatedAt").asText()))
+                .isBeforeOrEqualTo(Instant.now());
+
+        JsonNode communications = findById(systems, "communications");
+        assertThat(communications.path("status").asText()).isEqualTo("NOMINAL");
+        assertThat(communications.path("updatedAt").isNull()).isTrue();
+    }
+
+    @Test
     void reportsStaleTelemetryAsDataWithoutDiscardingItsLastValidMeasurement()
             throws InterruptedException {
         Instant measuredAt = Instant.now().minusSeconds(31);

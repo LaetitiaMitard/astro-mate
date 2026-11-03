@@ -131,6 +131,26 @@ class SystemDetailService {
         this.dashboardService = dashboardService;
     }
 
+    List<SystemSummaryResponse> getSystems() {
+        DashboardResponse dashboard = dashboardService.getDashboard();
+        Map<String, String> statuses = new LinkedHashMap<>();
+        dashboard.systemStatuses()
+                .forEach(state -> statuses.put(state.systemId(), state.status()));
+        Map<String, String> availability = readAvailability();
+        Map<String, CurrentMeasurement> measurements = readMeasurements();
+
+        return SYSTEMS.stream()
+                .map(system -> new SystemSummaryResponse(
+                        system.id(),
+                        system.name(),
+                        system.description(),
+                        statuses.get(system.id()),
+                        availability.get(system.id()),
+                        latestMeasurementAt(system.id(), measurements)
+                ))
+                .toList();
+    }
+
     SystemDetailResponse getSystemDetail(String systemId) {
         SystemMetadata system = SYSTEMS.stream()
                 .filter(candidate -> candidate.id().equals(systemId))

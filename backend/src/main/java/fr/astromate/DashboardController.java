@@ -1,5 +1,6 @@
 package fr.astromate;
 
+import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +38,11 @@ class DashboardController {
     @GetMapping("/dashboard")
     DashboardResponse getDashboard() {
         return dashboardService.getDashboard();
+    }
+
+    @GetMapping("/systems")
+    List<SystemSummaryResponse> getSystems() {
+        return systemDetailService.getSystems();
     }
 
     @GetMapping("/systems/{systemId}")

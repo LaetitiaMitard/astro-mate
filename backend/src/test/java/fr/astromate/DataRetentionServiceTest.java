@@ -74,7 +74,7 @@ class DataRetentionServiceTest {
 
     @Test
     void retainsRecentAndAlertProtectedDataWhileRemovingExpiredData() {
-        insertAlert("open", "oxygen", "OPEN", NOW.minusSeconds(20 * 24 * 60 * 60), null);
+        insertAlert("open", "oxygen", "OPEN", NOW.minusSeconds(10 * 24 * 60 * 60), null);
         insertAlert(
                 "resolved-recent",
                 "carbonDioxide",
@@ -107,6 +107,12 @@ class DataRetentionServiceTest {
         );
         insertEvent(
                 "open-alert",
+                "ALERT",
+                "oxygen",
+                NOW.minusSeconds(9 * 24 * 60 * 60)
+        );
+        insertEvent(
+                "before-open-alert",
                 "ALERT",
                 "oxygen",
                 NOW.minusSeconds(20 * 24 * 60 * 60)

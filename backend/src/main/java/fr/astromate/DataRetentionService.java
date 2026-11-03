@@ -52,11 +52,15 @@ class DataRetentionService {
                           SELECT 1
                           FROM alert_episode
                           WHERE alert_episode.metric_key = station_event.source
+                            AND julianday(station_event.occurred_at)
+                                >= julianday(alert_episode.detected_at)
                             AND (
                                 alert_episode.status = 'OPEN'
                                 OR (
                                     alert_episode.status = 'RESOLVED'
                                     AND alert_episode.resolved_at IS NOT NULL
+                                    AND julianday(station_event.occurred_at)
+                                        <= julianday(alert_episode.resolved_at)
                                     AND julianday(alert_episode.resolved_at)
                                         >= julianday(?)
                                 )

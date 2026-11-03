@@ -165,7 +165,7 @@ La base SQLite est locale. L’initialisation à chaque démarrage est idempoten
 - Mesures : rétention glissante de six heures.
 - Événements : rétention de sept jours; les événements liés à une alerte encore ouverte sont gardés jusqu’à sa résolution.
 - Alertes résolues : rétention de sept jours; alertes ouvertes : conservées jusqu’à leur résolution.
-- Pour un événement de catégorie `ALERT`, la source identifie la métrique de l’alerte. Ces événements restent conservés pendant l’ouverture de l’alerte, puis sept jours après sa résolution. Le nettoyage est exécuté au démarrage et toutes les minutes.
+- Pour un événement de catégorie `ALERT`, la source identifie la métrique de l’alerte et son horodatage le rattache à l’épisode. Ces événements restent conservés pendant l’ouverture de l’alerte, puis sept jours après sa résolution. Le nettoyage est exécuté au démarrage et toutes les minutes.
 
 Les horodatages sont stockés en UTC et présentés dans le fuseau local du navigateur.
 

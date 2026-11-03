@@ -129,7 +129,7 @@ Représente un fait technique horodaté consigné dans le journal.
 | `message` | Description de l’événement |
 | `occurredAt` | Date de l’événement en UTC |
 
-Un événement peut référencer un système et nommer sa source textuellement. Les événements de catégorie `ALERT` utilisent comme source la clé de la métrique concernée; cette association permet de conserver les événements pendant l’ouverture de l’alerte, puis sept jours après sa résolution. Il n’existe pas de lien direct vers un composant dans le modèle V1. Les autres événements sont conservés sept jours.
+Un événement peut référencer un système et nommer sa source textuellement. Les événements de catégorie `ALERT` utilisent comme source la clé de la métrique concernée; la métrique et l’intervalle entre détection et résolution rattachent l’événement à un épisode d’alerte. Ces événements sont conservés pendant l’ouverture de l’alerte, puis sept jours après sa résolution. Il n’existe pas de lien direct vers un composant dans le modèle V1. Les autres événements sont conservés sept jours.
 
 ## Relations
 

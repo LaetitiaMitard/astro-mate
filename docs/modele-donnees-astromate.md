@@ -72,6 +72,26 @@ Le backend initialise les dernières mesures canoniques dans `metric_measurement
 
 Les échantillons horodatés sont conservés dans `measurement_history` sur les six dernières heures, avec la métrique source, sa valeur et son unité canonique. La série de température joint les mesures des deux radiateurs au même horodatage et en calcule la moyenne arrondie au dixième; aucune mesure agrégée distincte n’est enregistrée.
 
+### SimulationState
+
+La table `simulation_state` conserve une ligne `thermal` : l’avancement du cycle
+en millisecondes (de 0 inclus à 240 000 exclus) et la date d’initialisation UTC.
+Chaque production sauvegarde l’avancement dans la même transaction que les
+mesures, les alertes et les événements. La première production après redémarrage
+reprend exactement cet avancement sans inclure le temps d’arrêt; les suivantes
+ajoutent le temps écoulé depuis la production précédente du processus courant.
+La date d’initialisation reste aussi celle des états simulés des composants sans
+métrique. La présence de cette ligne empêche de réensemencer l’historique aux
+démarrages suivants, même lorsqu’il est vide.
+
+La migration additive et idempotente `V20261103_02` crée cette table. Sur une base
+existante sans phase sauvegardée, le cycle est initialisé à sa première phase;
+les mesures, alertes et événements existants sont conservés. Après arrêt de
+l’application, un rollback applicatif peut laisser cette table en place :
+l’ancienne version l’ignore, mais ne sait pas reprendre le cycle. Supprimer la
+table ferait perdre l’avancement et le marqueur d’initialisation; ce n’est pas un
+reset complet de la station.
+
 ### DataQualityEpisode
 
 Représente un épisode de mesures physiquement invalides encore en cours pour une métrique. L’épisode actif est conservé dans `measurement_data_quality_episode`, avec la métrique et l’horodatage de son premier échantillon invalide. La migration additive et idempotente `V20261103_01` crée cette table sans backfill. Après arrêt de cette version applicative, son rollback consiste à supprimer la table; les événements DATA déjà historisés sont conservés. Les répétitions ne produisent pas de nouvel événement; le premier échantillon valide clôt l’épisode et produit un événement DATA INFO, quel que soit son état de seuil.

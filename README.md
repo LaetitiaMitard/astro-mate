@@ -33,11 +33,19 @@ le cycle. Les autres métriques restent nominales et sont rafraîchies à la mê
 cadence. La température affichée est leur moyenne, mais l’état thermique suit
 toujours le radiateur le plus sévèrement dégradé.
 
-À ce stade, le cycle repart de la première phase au démarrage du backend.
-La persistance de la phase et sa reprise sont prévues dans le ticket
-[#16](https://github.com/LaetitiaMitard/astro-mate/issues/16).
+Le cycle sauvegarde son avancement avec chaque production de télémétrie.
+Après un redémarrage, la première production reprend la phase et l’avancement
+sauvegardés, puis le cycle continue : le temps d’arrêt n’est pas compté.
 Pour désactiver la production automatique, utiliser la propriété Spring
 `astromate.simulation.enabled=false`.
+
+Sur une base vide, l’initialisation crée les quatre systèmes canoniques et les
+mesures nominales, avec six heures d’historique synthétique à pas de 10 secondes.
+Les composants thermiques et leurs associations aux métriques sont définis par
+le catalogue applicatif. Les horodatages sont persistés en UTC. Les démarrages
+suivants conservent les mesures, l’historique, les alertes et les événements
+existants, sans réensemencer un historique devenu vide.
+Aucun reset complet automatique n’est effectué.
 
 ## Architecture prévue
 

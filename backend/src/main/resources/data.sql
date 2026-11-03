@@ -59,8 +59,12 @@ SELECT
     )
 FROM sample_points
 CROSS JOIN history_values
-WHERE NOT EXISTS (
+WHERE NOT EXISTS (SELECT 1 FROM simulation_state WHERE scenario_id = 'thermal')
+AND NOT EXISTS (
     SELECT 1
     FROM measurement_history existing
     WHERE existing.metric_key = history_values.metric_key
 );
+
+INSERT OR IGNORE INTO simulation_state (scenario_id, elapsed_millis, initialized_at)
+VALUES ('thermal', 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));

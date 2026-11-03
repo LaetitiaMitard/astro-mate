@@ -90,7 +90,9 @@ class MeasurementService {
                             + metricKey + "."
             );
         }
-        closeDataQualityEpisode(metricKey, metric, measuredAt);
+        if (MetricStatusEvaluator.evaluate(metricKey, canonicalValue) == MetricStatus.NOMINAL) {
+            closeDataQualityEpisode(metricKey, metric, measuredAt);
+        }
 
         int updated = jdbcTemplate.update(
                 """

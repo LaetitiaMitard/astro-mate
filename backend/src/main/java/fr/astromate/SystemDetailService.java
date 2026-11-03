@@ -125,7 +125,6 @@ class SystemDetailService {
 
     private final JdbcTemplate jdbcTemplate;
     private final DashboardService dashboardService;
-    private final Instant simulatedStateStartedAt = Instant.now();
 
     SystemDetailService(JdbcTemplate jdbcTemplate, DashboardService dashboardService) {
         this.jdbcTemplate = jdbcTemplate;
@@ -147,6 +146,10 @@ class SystemDetailService {
                 .forEach(state -> statuses.put(state.systemId(), state.status()));
         Map<String, String> availability = readAvailability();
         Instant now = Instant.now();
+        Instant simulatedStateStartedAt = Instant.parse(jdbcTemplate.queryForObject(
+                "SELECT initialized_at FROM simulation_state WHERE scenario_id = 'thermal'",
+                String.class
+        ));
 
         List<Metric> metrics = system.metricKeys().stream()
                 .map(key -> metric(key, measurements.get(key), now))

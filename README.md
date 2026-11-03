@@ -39,6 +39,22 @@ sans ouvrir d’alerte de seuil. La dernière valeur valide et son horodatage re
 consultables. Cette surveillance continue même lorsque la simulation automatique
 est désactivée.
 
+La disponibilité simulée est indépendante de la fraîcheur des mesures : un
+système explicitement `OFFLINE` suspend sa télémétrie et ne produit aucun événement
+de péremption par métrique. Son passage hors ligne est journalisé en catégorie
+`SYSTEM`, niveau `WARNING`, et son retour en ligne en `INFO`, sans créer d’alerte
+de seuil. Les dernières valeurs restent horodatées et leur état devient `UNKNOWN`
+après plus de 30 secondes, tandis que le système reste hors ligne. Une mesure absente ou
+périmée ne suffit jamais à déclarer un système hors ligne.
+
+Une panne de l’API ou de SQLite est signalée par « Simulation indisponible » :
+les vues concernées masquent leurs données conservées, sans valeurs de secours.
+Un contrôle périodique toutes les 10 secondes complète les notifications de
+télémétrie, et une lecture sans réponse échoue après 5 secondes. Les déclenchements
+rapprochés, y compris les reconnexions du flux de notifications, sont regroupés
+pour laisser expirer les lectures bloquées. L’affichage reprend uniquement après
+une réponse valide de l’API.
+
 Le cycle sauvegarde son avancement avec chaque production de télémétrie.
 Après un redémarrage, la première production reprend la phase et l’avancement
 sauvegardés, puis le cycle continue : le temps d’arrêt n’est pas compté.

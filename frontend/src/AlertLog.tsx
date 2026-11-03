@@ -25,7 +25,7 @@ interface AlertFilters {
   systemId: string;
 }
 
-export default function AlertLog() {
+export default function AlertLog({ refreshVersion = 0 }: { refreshVersion?: number }) {
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<AlertFilters>({
     status: "",
@@ -61,7 +61,7 @@ export default function AlertLog() {
       });
 
     return () => controller.abort();
-  }, [filters, page]);
+  }, [filters, page, refreshVersion]);
 
   function updateFilter<K extends keyof AlertFilters>(
     key: K,
@@ -143,7 +143,7 @@ export default function AlertLog() {
       {loadState === "error" && (
         <section className="error-panel" role="alert">
           <h3>Alertes indisponibles</h3>
-          <p>Impossible de lire les alertes de la station.</p>
+          <p>Simulation indisponible. Impossible de lire les alertes de la station.</p>
         </section>
       )}
 

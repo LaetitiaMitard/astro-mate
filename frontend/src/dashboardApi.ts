@@ -406,8 +406,14 @@ function isDashboard(value: unknown): value is Dashboard {
   );
 }
 
+function fetchSimulation(path: string, signal: AbortSignal): Promise<Response> {
+  return fetch(path, {
+    signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+  });
+}
+
 export async function getDashboard(signal: AbortSignal): Promise<Dashboard> {
-  const response = await fetch("/api/v1/dashboard", { signal });
+  const response = await fetchSimulation("/api/v1/dashboard", signal);
 
   if (!response.ok) {
     throw new Error(`Dashboard request failed with status ${response.status}`);
@@ -446,7 +452,7 @@ export async function getEvents(
   if (filters.query) {
     parameters.set("q", filters.query);
   }
-  const response = await fetch(`/api/v1/events?${parameters}`, { signal });
+  const response = await fetchSimulation(`/api/v1/events?${parameters}`, signal);
 
   if (!response.ok) {
     throw new Error(`Event log request failed with status ${response.status}`);
@@ -480,7 +486,7 @@ export async function getAlerts(
     parameters.set("systemId", filters.systemId);
   }
 
-  const response = await fetch(`/api/v1/alerts?${parameters}`, { signal });
+  const response = await fetchSimulation(`/api/v1/alerts?${parameters}`, signal);
 
   if (!response.ok) {
     throw new Error(`Alert list request failed with status ${response.status}`);
@@ -498,9 +504,9 @@ export async function getSystemDetail(
   systemId: string,
   signal: AbortSignal,
 ): Promise<SystemDetail> {
-  const response = await fetch(
+  const response = await fetchSimulation(
     `/api/v1/systems/${encodeURIComponent(systemId)}`,
-    { signal },
+    signal,
   );
 
   if (!response.ok) {
@@ -520,9 +526,9 @@ export async function getIndicatorMeasurements(
   indicatorKey: string,
   signal: AbortSignal,
 ): Promise<MeasurementSeries> {
-  const response = await fetch(
+  const response = await fetchSimulation(
     `/api/v1/systems/${encodeURIComponent(systemId)}/indicators/${encodeURIComponent(indicatorKey)}/measurements`,
-    { signal },
+    signal,
   );
 
   if (!response.ok) {

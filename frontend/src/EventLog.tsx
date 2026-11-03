@@ -48,7 +48,7 @@ function getPeriodError(filters: Pick<EventLogForm, "from" | "to">): string | nu
   return null;
 }
 
-export default function EventLog() {
+export default function EventLog({ refreshVersion = 0 }: { refreshVersion?: number }) {
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<EventLogForm>(initialFilters);
   const [result, setResult] = useState<EventLogPage | null>(null);
@@ -90,7 +90,7 @@ export default function EventLog() {
       });
 
     return () => controller.abort();
-  }, [filters, page, periodError]);
+  }, [filters, page, periodError, refreshVersion]);
 
   function updateFilter<K extends keyof EventLogForm>(
     key: K,
@@ -228,7 +228,7 @@ export default function EventLog() {
         <section className="error-panel" role="alert">
           <h3>Journal technique indisponible</h3>
           <p>
-            Impossible de lire les événements de la station.
+            Simulation indisponible. Impossible de lire les événements de la station.
           </p>
         </section>
       )}

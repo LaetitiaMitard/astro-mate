@@ -112,6 +112,11 @@ export default function ThermalSystemDetail({
           {statusLabels[detail.status]}
         </span>
       </div>
+      {detail.availability === "OFFLINE" && (
+        <p className="offline-system-note">
+          Télémétrie suspendue — système simulé hors ligne.
+        </p>
+      )}
       <div className="system-measurement">
         <span>Dernière mesure valide</span>
         <strong>{formatMeasurementDate(detail.updatedAt)}</strong>
@@ -322,7 +327,7 @@ export default function ThermalSystemDetail({
             {historyLoadState === "error" && (
               <section className="error-panel" role="alert">
                 <p className="eyebrow">LECTURE IMPOSSIBLE</p>
-                <p>L’historique thermique est indisponible.</p>
+                <p>Simulation indisponible. L’historique thermique est indisponible.</p>
               </section>
             )}
             {historyLoadState === "loaded" && history && (

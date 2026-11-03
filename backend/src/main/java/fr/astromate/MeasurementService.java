@@ -79,6 +79,14 @@ class MeasurementService {
             throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
         }
         MetricSnapshot metric = previousMeasurements.get(0);
+        String availability = jdbcTemplate.queryForObject(
+                "SELECT availability FROM system_availability WHERE system_id = ?",
+                String.class,
+                metric.systemId()
+        );
+        if ("OFFLINE".equals(availability)) {
+            return;
+        }
         if (!MetricStatusEvaluator.isPhysicallyValid(metricKey, canonicalValue)) {
             if (openDataQualityEpisode(metricKey, metric, measuredAt)) {
                 eventPublisher.publishEvent(new MeasurementChangeEvent());
@@ -163,6 +171,9 @@ class MeasurementService {
                 """
                 SELECT metric_key, system_id, metric_id, name, value, unit, measured_at
                 FROM metric_measurement
+                WHERE system_id IN (
+                    SELECT system_id FROM system_availability WHERE availability = 'ONLINE'
+                )
                 """,
                 (resultSet, rowNumber) -> new MetricSnapshot(
                         resultSet.getString("metric_key"),
@@ -456,13 +467,34 @@ class MeasurementService {
             throw new IllegalArgumentException("Disponibilité système invalide.");
         }
         int updated = jdbcTemplate.update(
-                "UPDATE system_availability SET availability = ? WHERE system_id = ?",
+                """
+                UPDATE system_availability SET availability = ?
+                WHERE system_id = ? AND availability <> ?
+                """,
                 availability,
-                systemId
+                systemId,
+                availability
         );
-        if (updated != 1) {
-            throw new IllegalArgumentException("Système non initialisé : " + systemId);
+        if (updated == 0) {
+            if (jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM system_availability WHERE system_id = ?",
+                    Integer.class,
+                    systemId
+            ) == 0) {
+                throw new IllegalArgumentException("Système non initialisé : " + systemId);
+            }
+            return;
         }
+        boolean offline = "OFFLINE".equals(availability);
+        insertTechnicalEvent(
+                "simulation",
+                systemId,
+                offline ? "WARNING" : "INFO",
+                SystemDetailService.systemName(systemId)
+                        + (offline ? " simulé hors ligne." : " simulé de retour en ligne."),
+                Instant.now(),
+                "SYSTEM"
+        );
         eventPublisher.publishEvent(new MeasurementChangeEvent());
     }
 

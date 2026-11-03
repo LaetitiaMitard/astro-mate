@@ -5,6 +5,8 @@ import App from "./App";
 class TestEventSource {
   static instance: TestEventSource | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onopen: ((event: Event) => void) | null = null;
   close = vi.fn();
 
   constructor(readonly url: string) {
@@ -235,12 +237,118 @@ const thermalTemperatureHistory = {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   window.history.replaceState(null, "", "/");
   vi.unstubAllGlobals();
   TestEventSource.instance = null;
 });
 
 describe("AstroMate dashboard", () => {
+  it("reports an unresponsive API even while the live connection repeatedly retries", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", TestEventSource);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboard)))
+      .mockImplementation((_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+      ));
+    await act(async () => { render(<App />); });
+    expect(screen.getByText("21")).toBeInTheDocument();
+
+    for (let second = 0; second < 6; second++) {
+      await act(async () => {
+        TestEventSource.instance?.onerror?.(new Event("error"));
+      });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    }
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Simulation indisponible");
+    expect(screen.queryByText("21")).not.toBeInTheDocument();
+  });
+
+  it("stops presenting cached measurements when the API no longer responds", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboard)))
+      .mockImplementation((_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+      ));
+    await act(async () => { render(<App />); });
+    expect(screen.getByText("21")).toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_999); });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Simulation indisponible");
+    expect(screen.queryByText("21")).not.toBeInTheDocument();
+    expect(screen.queryByText("Simulation active")).not.toBeInTheDocument();
+  });
+
+  it.each(["/events", "/alerts"])(
+    "detects an idle API outage and recovery on %s",
+    async (path) => {
+      vi.useFakeTimers();
+      window.history.replaceState(null, "", path);
+      const emptyPage = { items: [], page: 0, pageSize: 20, totalElements: 0, totalPages: 0 };
+      vi.stubGlobal("fetch", vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(emptyPage)))
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockResolvedValueOnce(new Response(JSON.stringify(emptyPage))));
+      await act(async () => { render(<App />); });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.getByRole("alert")).toHaveTextContent("Simulation indisponible");
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
+
+  it("detects an API outage without telemetry events and recovers without cached values", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboard)))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ...dashboard,
+        indicators: dashboard.indicators.map((indicator) =>
+          indicator.key === "oxygen" ? { ...indicator, value: 22 } : indicator,
+        ),
+      })));
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => { render(<App />); });
+    expect(screen.getByText("21")).toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Simulation indisponible");
+    expect(screen.queryByText("21")).not.toBeInTheDocument();
+    expect(screen.queryByText("Simulation active")).not.toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(screen.getByText("22")).toBeInTheDocument();
+    expect(screen.getByText("Simulation active")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it.each(["/", "/systems", "/systems/thermal-control", "/alerts", "/events"])(
+    "announces Simulation indisponible on %s when the API cannot be reached",
+    async (path) => {
+      window.history.replaceState(null, "", path);
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+      render(<App />);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Simulation indisponible");
+      expect(screen.queryByText("Simulation active")).not.toBeInTheDocument();
+      expect(screen.queryByText("21")).not.toBeInTheDocument();
+    },
+  );
+
   it("shows the four nominal indicators returned by the simulation", async () => {
     vi.stubGlobal(
       "fetch",
@@ -554,6 +662,30 @@ describe("AstroMate dashboard", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("checks the API when the live connection fails and when it reconnects", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", TestEventSource);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboard)))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboard))));
+    await act(async () => { render(<App />); });
+    expect(screen.getByText("21")).toBeInTheDocument();
+
+    await act(async () => {
+      TestEventSource.instance?.onerror?.(new Event("error"));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Simulation indisponible");
+    expect(screen.queryByText("21")).not.toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_000); });
+    await act(async () => {
+      TestEventSource.instance?.onopen?.(new Event("open"));
+    });
+    expect(screen.getByText("21")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("refreshes thermal details and history from the same server event", async () => {
     vi.stubGlobal("EventSource", TestEventSource);
     const changedDetail = {
@@ -677,6 +809,59 @@ describe("AstroMate dashboard", () => {
       screen.getByText("Systèmes hors ligne : Contrôle thermique"),
     ).toBeInTheDocument();
   });
+
+  it.each(["OFFLINE", "UNKNOWN"])(
+    "distinguishes %s from stale measurements and displays their real timestamps",
+    async (status) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        ...dashboard,
+        stationStatus: status,
+        offlineSystems: status === "OFFLINE" ? ["thermal-control"] : [],
+        systemStatuses: dashboard.systemStatuses.map((system) =>
+          system.systemId === "thermal-control" ? { ...system, status } : system,
+        ),
+        indicators: dashboard.indicators.map((indicator) =>
+          indicator.key === "temperature" ? { ...indicator, status: "UNKNOWN" } : indicator,
+        ),
+      }))));
+      render(<App />);
+
+      const heading = await screen.findByRole("heading", { name: "Température" });
+      const card = heading.closest("article")!;
+      expect(within(card).getByText("22,3")).toBeInTheDocument();
+      expect(within(card).getByText("INCONNU")).toBeInTheDocument();
+      expect(within(card).getByText(/20\/10\/2026/))
+        .toHaveAttribute("datetime", "2026-10-20T12:00:00Z");
+      if (status === "OFFLINE") {
+        expect(within(card).getByText(/Télémétrie suspendue.*hors ligne/)).toBeInTheDocument();
+      } else {
+        expect(within(card).getByText(/Mesure absente ou périmée/)).toBeInTheDocument();
+        expect(screen.queryByText("HORS LIGNE")).not.toBeInTheDocument();
+      }
+    },
+  );
+
+  it.each(["/systems", "/systems/life-support", "/systems/thermal-control"])(
+    "explains suspended telemetry on %s independently of the measurement status",
+    async (path) => {
+      window.history.replaceState(null, "", path);
+      vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+        const url = input.toString();
+        const payload = url.endsWith("/measurements")
+          ? thermalTemperatureHistory
+          : url.endsWith("/systems/thermal-control")
+            ? { ...thermalSystemDetail, availability: "OFFLINE", status: "OFFLINE" }
+            : { ...dashboard, offlineSystems: ["life-support", "thermal-control"] };
+        return Promise.resolve(new Response(JSON.stringify(payload)));
+      }));
+      render(<App />);
+
+      expect((await screen.findAllByText(/Télémétrie suspendue.*hors ligne/)).length)
+        .toBeGreaterThan(0);
+      expect(screen.queryByText("Simulation indisponible")).not.toBeInTheDocument();
+      expect(screen.getAllByText(/20\/10\/2026/).length).toBeGreaterThan(0);
+    },
+  );
 
   it("does not display nominal values when the dashboard API is unavailable", async () => {
     vi.stubGlobal(

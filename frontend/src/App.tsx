@@ -126,23 +126,34 @@ export default function App() {
   );
 
   useEffect(() => {
+    let lastRefreshAt: number | null = null;
+    function refresh() {
+      const now = Date.now();
+      // Laisser une lecture atteindre son délai de 5 s avant de la remplacer.
+      if (lastRefreshAt !== null && now - lastRefreshAt < 6_000) {
+        return;
+      }
+      lastRefreshAt = now;
+      setRefreshVersion((version) => version + 1);
+    }
+
+    const interval = window.setInterval(refresh, 10_000);
     if (typeof EventSource === "undefined") {
-      return;
+      return () => window.clearInterval(interval);
     }
 
     const eventSource = new EventSource("/api/v1/telemetry/changes");
     let refreshTimeout: number | null = null;
+    eventSource.onerror = eventSource.onopen = refresh;
     eventSource.onmessage = () => {
       if (refreshTimeout !== null) {
         window.clearTimeout(refreshTimeout);
       }
-      refreshTimeout = window.setTimeout(
-        () => setRefreshVersion((version) => version + 1),
-        50,
-      );
+      refreshTimeout = window.setTimeout(refresh, 50);
     };
 
     return () => {
+      window.clearInterval(interval);
       if (refreshTimeout !== null) {
         window.clearTimeout(refreshTimeout);
       }
@@ -249,8 +260,8 @@ export default function App() {
         </a>
       </nav>
 
-      {isEventLogRoute && <EventLog />}
-      {isAlertLogRoute && <AlertLog />}
+      {isEventLogRoute && <EventLog refreshVersion={refreshVersion} />}
+      {isAlertLogRoute && <AlertLog refreshVersion={refreshVersion} />}
 
       {!isHistoryRoute && loadState === "loading" && (
         <p className="loading" role="status">
@@ -263,8 +274,8 @@ export default function App() {
           <p className="eyebrow">LECTURE IMPOSSIBLE</p>
           <h2>Tableau de bord indisponible</h2>
           <p>
-            Impossible de lire les données de la simulation. Aucune valeur
-            nominale n’est affichée.
+            Simulation indisponible. Impossible de lire l’API ou la base locale.
+            Aucune mesure conservée n’est présentée comme courante.
           </p>
         </section>
       )}
@@ -281,7 +292,8 @@ export default function App() {
                 <section className="error-panel" role="alert">
                   <h2>Détail du système indisponible</h2>
                   <p>
-                    Impossible de lire les métriques et composants thermiques.
+                    Simulation indisponible. Impossible de lire les métriques et
+                    composants thermiques.
                   </p>
                 </section>
               ) : (
@@ -313,6 +325,11 @@ export default function App() {
                   {statusLabels[selectedSystemStatus]}
                 </span>
               </div>
+              {dashboard.offlineSystems.includes(selectedSystem.id) && (
+                <p className="offline-system-note">
+                  Télémétrie suspendue — système simulé hors ligne.
+                </p>
+              )}
               <div className="system-measurement">
                 <span>Dernière mesure valide</span>
                 <strong>
@@ -377,6 +394,11 @@ export default function App() {
                           <span className="system-card-description">
                             {system.description}
                           </span>
+                          {dashboard.offlineSystems.includes(system.id) && (
+                            <span className="offline-system-note">
+                              Télémétrie suspendue — système simulé hors ligne.
+                            </span>
+                          )}
                           <span className="system-card-measurement">
                             Dernière mesure valide :{" "}
                             {formatMeasurementDate(
@@ -463,6 +485,21 @@ export default function App() {
                       {formatRange(indicator.nominalRange, indicator.unit)}
                     </strong>
                   </div>
+                  <p className="system-card-measurement">
+                    Dernière mesure valide :{" "}
+                    <time dateTime={indicator.measuredAt ?? undefined}>
+                      {formatMeasurementDate(indicator.measuredAt)}
+                    </time>
+                  </p>
+                  {dashboard.offlineSystems.includes(indicator.systemId) ? (
+                    <p className="offline-system-note">
+                      Télémétrie suspendue — système simulé hors ligne.
+                    </p>
+                  ) : indicator.status === "UNKNOWN" && (
+                    <p className="offline-system-note">
+                      Mesure absente ou périmée — état courant inconnu.
+                    </p>
+                  )}
                 </article>
               ))}
             </div>

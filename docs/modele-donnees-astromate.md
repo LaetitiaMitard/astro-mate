@@ -74,7 +74,7 @@ Les échantillons horodatés sont conservés dans `measurement_history` sur les 
 
 ### DataQualityEpisode
 
-Représente un épisode de mesures physiquement invalides encore en cours pour une métrique. L’épisode actif est conservé dans `measurement_data_quality_episode`, avec la métrique et l’horodatage de son premier échantillon invalide. Les répétitions ne produisent pas de nouvel événement; le premier échantillon valide clôt l’épisode et produit un événement DATA INFO, quel que soit son état de seuil.
+Représente un épisode de mesures physiquement invalides encore en cours pour une métrique. L’épisode actif est conservé dans `measurement_data_quality_episode`, avec la métrique et l’horodatage de son premier échantillon invalide. La migration additive et idempotente `V20261103_01` crée cette table sans backfill. Après arrêt de cette version applicative, son rollback consiste à supprimer la table; les événements DATA déjà historisés sont conservés. Les répétitions ne produisent pas de nouvel événement; le premier échantillon valide clôt l’épisode et produit un événement DATA INFO, quel que soit son état de seuil.
 
 ### Alert
 

@@ -33,6 +33,12 @@ le cycle. Les autres métriques restent nominales et sont rafraîchies à la mê
 cadence. La température affichée est leur moyenne, mais l’état thermique suit
 toujours le radiateur le plus sévèrement dégradé.
 
+Une mesure valide devient périmée après plus de 30 secondes sans nouveau relevé :
+son état passe à inconnu et un événement de catégorie `DATA` est ajouté au journal,
+sans ouvrir d’alerte de seuil. La dernière valeur valide et son horodatage restent
+consultables. Cette surveillance continue même lorsque la simulation automatique
+est désactivée.
+
 Le cycle sauvegarde son avancement avec chaque production de télémétrie.
 Après un redémarrage, la première production reprend la phase et l’avancement
 sauvegardés, puis le cycle continue : le temps d’arrêt n’est pas compté.

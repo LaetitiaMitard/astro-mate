@@ -50,6 +50,7 @@ class AstroMateApplicationTest {
     void resetDashboardMeasurements() {
         jdbcTemplate.update("DELETE FROM measurement_history");
         jdbcTemplate.update("DELETE FROM measurement_data_quality_episode");
+        jdbcTemplate.update("DELETE FROM measurement_staleness_episode");
         jdbcTemplate.update(
                 "UPDATE metric_measurement SET measured_at = '1970-01-01T00:00:00Z'"
         );
@@ -115,6 +116,51 @@ class AstroMateApplicationTest {
         assertIndicator(indicators, "carbonDioxide", "400", "ppm", "0", "1000");
         assertIndicator(indicators, "temperature", "22.3", "°C", "18", "26");
         assertIndicator(indicators, "availableEnergy", "78", "%", "20", "100");
+    }
+
+    @Test
+    void reportsStaleTelemetryAsDataWithoutDiscardingItsLastValidMeasurement()
+            throws InterruptedException {
+        Instant measuredAt = Instant.now().minusSeconds(31);
+        jdbcTemplate.update(
+                "UPDATE metric_measurement SET measured_at = ? WHERE metric_key = 'oxygen'",
+                measuredAt.toString()
+        );
+
+        JsonNode dashboard = getDashboard();
+        assertThat(dashboard.path("stationStatus").asText()).isEqualTo("UNKNOWN");
+        JsonNode oxygenIndicator = findByKey(dashboard.path("indicators"), "oxygen");
+        assertThat(oxygenIndicator.path("status").asText()).isEqualTo("UNKNOWN");
+        assertThat(oxygenIndicator.path("value").asDouble()).isEqualTo(21);
+        assertThat(Instant.parse(oxygenIndicator.path("measuredAt").asText()))
+                .isEqualTo(measuredAt);
+
+        JsonNode oxygenMetric = findById(
+                getSystemDetail("life-support").path("metrics"),
+                "oxygen-level"
+        );
+        assertThat(oxygenMetric.path("status").asText()).isEqualTo("UNKNOWN");
+        assertThat(oxygenMetric.path("value").asDouble()).isEqualTo(21);
+        assertThat(Instant.parse(oxygenMetric.path("measuredAt").asText()))
+                .isEqualTo(measuredAt);
+
+        Instant deadline = Instant.now().plusSeconds(3);
+        JsonNode dataEvents = getDataEvents(measuredAt, deadline);
+        while (dataEvents.isEmpty() && Instant.now().isBefore(deadline)) {
+            Thread.sleep(100);
+            dataEvents = getDataEvents(measuredAt, deadline);
+        }
+
+        assertThat(dataEvents).hasSize(1);
+        assertThat(dataEvents.get(0).path("level").asText()).isEqualTo("WARNING");
+        assertThat(dataEvents.get(0).path("category").asText()).isEqualTo("DATA");
+        assertThat(dataEvents.get(0).path("source").asText()).isEqualTo("oxygen");
+        assertThat(dataEvents.get(0).path("message").asText()).contains("périmée");
+        assertThat(Instant.parse(dataEvents.get(0).path("occurredAt").asText()))
+                .isAfterOrEqualTo(measuredAt.plusSeconds(30));
+        Thread.sleep(1_100);
+        assertThat(getDataEvents(measuredAt, deadline)).hasSize(1);
+        assertThat(getDashboard().path("recentOpenAlerts")).isEmpty();
     }
 
     @Test

@@ -60,11 +60,12 @@ class MeasurementService {
 
         List<MetricSnapshot> previousMeasurements = jdbcTemplate.query(
                 """
-                SELECT system_id, metric_id, name, value, unit, measured_at
+                SELECT metric_key, system_id, metric_id, name, value, unit, measured_at
                 FROM metric_measurement
                 WHERE metric_key = ?
                 """,
                 (resultSet, rowNumber) -> new MetricSnapshot(
+                        resultSet.getString("metric_key"),
                         resultSet.getString("system_id"),
                         resultSet.getString("metric_id"),
                         resultSet.getString("name"),
@@ -88,6 +89,12 @@ class MeasurementService {
             throw new IllegalArgumentException(
                     "Une mesure ne peut pas remplacer une mesure plus récente pour "
                             + metricKey + "."
+            );
+        }
+        if (!MetricStatusEvaluator.isStale(measuredAt, Instant.now())) {
+            jdbcTemplate.update(
+                    "DELETE FROM measurement_staleness_episode WHERE metric_key = ?",
+                    metricKey
             );
         }
         if (MetricStatusEvaluator.evaluate(metricKey, canonicalValue) == MetricStatus.NOMINAL) {
@@ -148,6 +155,63 @@ class MeasurementService {
             updateLegacyTemperatureProjection(measuredAt);
         }
         eventPublisher.publishEvent(new MeasurementChangeEvent());
+    }
+
+    @Transactional
+    void recordStaleMeasurements(Instant now) {
+        List<MetricSnapshot> measurements = jdbcTemplate.query(
+                """
+                SELECT metric_key, system_id, metric_id, name, value, unit, measured_at
+                FROM metric_measurement
+                """,
+                (resultSet, rowNumber) -> new MetricSnapshot(
+                        resultSet.getString("metric_key"),
+                        resultSet.getString("system_id"),
+                        resultSet.getString("metric_id"),
+                        resultSet.getString("name"),
+                        resultSet.getDouble("value"),
+                        resultSet.getString("unit"),
+                        resultSet.getString("measured_at")
+                )
+        );
+        boolean staleMeasurementRecorded = false;
+        for (MetricSnapshot metric : measurements) {
+            if (!MetricStatusEvaluator.isPhysicallyValid(
+                    metric.metricKey(),
+                    metric.value()
+            ) || !MetricStatusEvaluator.ruleFor(metric.metricKey())
+                    .unit().equals(metric.unit())
+                    || !MetricStatusEvaluator.isStale(
+                            Instant.parse(metric.measuredAt()),
+                            now
+                    )) {
+                continue;
+            }
+            int inserted = jdbcTemplate.update(
+                    """
+                    INSERT OR IGNORE INTO measurement_staleness_episode
+                        (metric_key, started_at)
+                    VALUES (?, ?)
+                    """,
+                    metric.metricKey(),
+                    now.toString()
+            );
+            if (inserted == 1) {
+                insertTechnicalEvent(
+                        metric.metricKey(),
+                        metric.systemId(),
+                        "WARNING",
+                        "La dernière mesure valide de " + metric.name()
+                                + " est périmée.",
+                        now,
+                        "DATA"
+                );
+                staleMeasurementRecorded = true;
+            }
+        }
+        if (staleMeasurementRecorded) {
+            eventPublisher.publishEvent(new MeasurementChangeEvent());
+        }
     }
 
     private void recordStatusTransition(
@@ -457,6 +521,7 @@ class MeasurementService {
     }
 
     private record MetricSnapshot(
+            String metricKey,
             String systemId,
             String metricId,
             String name,

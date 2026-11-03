@@ -292,7 +292,7 @@ class DashboardService {
             return MetricStatus.UNKNOWN;
         }
         Instant measuredAt = Instant.parse(measurement.measuredAt());
-        return measuredAt.isBefore(now.minusSeconds(30))
+        return MetricStatusEvaluator.isStale(measuredAt, now)
                 ? MetricStatus.UNKNOWN
                 : status;
     }

@@ -332,8 +332,10 @@ class SystemDetailService {
                         .unit().equals(measurement.unit())) {
             return MetricStatus.UNKNOWN;
         }
-        return Instant.parse(measurement.measuredAt())
-                        .isBefore(now.minusSeconds(30))
+        return MetricStatusEvaluator.isStale(
+                Instant.parse(measurement.measuredAt()),
+                now
+        )
                 ? MetricStatus.UNKNOWN
                 : evaluated;
     }

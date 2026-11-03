@@ -1,5 +1,7 @@
 package fr.astromate;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Map;
@@ -13,6 +15,7 @@ enum MetricStatus {
 }
 
 final class MetricStatusEvaluator {
+    private static final Duration MEASUREMENT_FRESHNESS = Duration.ofSeconds(30);
     private static final Map<String, Rule> RULES = Map.of(
             "oxygen", new Rule("% vol.", 19.0, 23.0, true, true, 17.0, 25.0, 0.0, 100.0),
             "carbonDioxide", new Rule("ppm", 0.0, 1000.0, true, true, null, 2000.0, 0.0, null),
@@ -58,6 +61,10 @@ final class MetricStatusEvaluator {
                 && Double.isFinite(value)
                 && (rule.physicalMin() == null || value >= rule.physicalMin())
                 && (rule.physicalMax() == null || value <= rule.physicalMax());
+    }
+
+    static boolean isStale(Instant measuredAt, Instant now) {
+        return measuredAt.isBefore(now.minus(MEASUREMENT_FRESHNESS));
     }
 
     static MetricStatus mostSevere(Collection<MetricStatus> statuses) {

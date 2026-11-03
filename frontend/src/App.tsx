@@ -14,6 +14,33 @@ import {
 import AlertLog from "./AlertLog";
 import EventLog from "./EventLog";
 import ThermalSystemDetail from "./ThermalSystemDetail";
+import StationOverview from "./StationOverview";
+
+const indicatorIcons: Record<string, string> = {
+  oxygen: "M8 5a7 7 0 1 0 0 14A7 7 0 0 0 8 5Zm9 11c0-4 5-4 5-1 0 2-5 3-5 6h5",
+  carbonDioxide: "M6 18a4 4 0 0 1-1-8 7 7 0 0 1 13-1 4.5 4.5 0 0 1 0 9Z",
+  temperature: "M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0ZM12 10v8M17 5h3M17 9h2",
+  availableEnergy: "m14 2-9 12h6l-1 8 9-12h-6Z",
+};
+
+function DashboardClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <time className="dashboard-clock" dateTime={now.toISOString()}>
+      <span>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "full" }).format(now)}</span>
+      <strong>{new Intl.DateTimeFormat("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      }).format(now)}</strong>
+    </time>
+  );
+}
 
 const statusLabels: Record<Dashboard["stationStatus"], string> = {
   NOMINAL: "NOMINAL",
@@ -246,6 +273,15 @@ export default function App() {
   }, []);
 
   function navigate(event: MouseEvent<HTMLAnchorElement>) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
     event.preventDefault();
     const nextPath = event.currentTarget.pathname;
     window.history.pushState(null, "", nextPath);
@@ -293,7 +329,7 @@ export default function App() {
             </svg>
             <div>
               <h1>Astro<span>Mate</span></h1>
-              <p>Centre de contrôle</p>
+              <p>Une station plus sûre,<br />ensemble</p>
             </div>
           </div>
           <button
@@ -337,9 +373,17 @@ export default function App() {
       </aside>
       <main className="app-content" ref={contentRef} tabIndex={-1}>
       <header className="page-header">
-        <p className="eyebrow">CENTRE DE CONTRÔLE · STATION UNIQUE</p>
-        <p className="notice">Simulation — données fictives, non opérationnelles</p>
+        {!isHistoryRoute && !isSystemRoute ? (
+          <div className="dashboard-greeting">
+            <h2>Bonjour !</h2>
+            <p>Voici l’état actuel de la station spatiale.</p>
+          </div>
+        ) : (
+          <p className="eyebrow">CENTRE DE CONTRÔLE · STATION UNIQUE</p>
+        )}
+        <DashboardClock />
       </header>
+      <p className="notice">Simulation — données fictives, non opérationnelles</p>
 
       {isEventLogRoute && <EventLog refreshVersion={refreshVersion} />}
       {isAlertLogRoute && <AlertLog refreshVersion={refreshVersion} />}
@@ -548,31 +592,28 @@ export default function App() {
           </section>
 
           <section className="indicators-section">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">SURVEILLANCE DE LA STATION</p>
-                <h2>Indicateurs principaux</h2>
-              </div>
-              <span className="section-count">04 MESURES</span>
-            </div>
+            <h2 className="visually-hidden">Indicateurs principaux</h2>
             <div className="indicator-grid">
               {dashboard.indicators.map((indicator) => (
-                <article className="indicator-card" key={indicator.key}>
+                <article className={`indicator-card indicator-${indicator.key}`} key={indicator.key}>
+                  <div className="indicator-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d={indicatorIcons[indicator.key]} />
+                    </svg>
+                  </div>
                   <div className="indicator-card-heading">
                     <h3>{indicator.name}</h3>
-                    <span
-                      className={`metric-status status-${indicator.status.toLowerCase()}`}
-                    >
-                      {statusLabels[indicator.status]}
-                    </span>
                   </div>
                   <p className="indicator-value">
                     <strong>{formatValue(indicator.value)}</strong>
                     <span>{indicator.unit}</span>
                   </p>
                   <div className="indicator-range">
-                    <span>Plage nominale</span>
+                    <span className={`indicator-state status-${indicator.status.toLowerCase()}`}>
+                      {statusLabels[indicator.status]}
+                    </span>
                     <strong>
+                      <span className="visually-hidden">Plage nominale : </span>
                       {formatRange(indicator.nominalRange, indicator.unit)}
                     </strong>
                   </div>
@@ -596,29 +637,63 @@ export default function App() {
             </div>
           </section>
 
+          <div className="dashboard-main-grid">
+          <StationOverview
+            systems={systems.map((system) => ({
+              ...system,
+              status: getSystemStatus(system.id, dashboard),
+            }))}
+            stationStatus={dashboard.stationStatus}
+            statusLabels={statusLabels}
+            onNavigate={navigate}
+          />
           <section className="alerts-panel" aria-labelledby="alerts-heading">
-            <div className="alerts-icon" aria-hidden="true">
-              !
+            <div className="section-heading">
+              <h2 id="alerts-heading">Alertes ouvertes <span className="alert-count">({dashboard.recentOpenAlerts.length})</span></h2>
+              <a className="back-link" href="/alerts" onClick={navigate}>
+                Consulter toutes les alertes
+              </a>
             </div>
-            <div>
-              <h2 id="alerts-heading">Alertes ouvertes</h2>
               {dashboard.recentOpenAlerts.length === 0 ? (
-                <p>Aucune alerte ouverte</p>
+                <div className="empty-alerts">
+                  <span className="empty-alerts-icon" aria-hidden="true">✓</span>
+                  <p>Aucune alerte ouverte</p>
+                  <span>Les alertes de la simulation apparaîtront ici.</span>
+                </div>
               ) : (
-                <ul>
+                <ul className="recent-alert-list">
                   {dashboard.recentOpenAlerts.map((alert) => (
-                    <li key={alert.id}>{alert.message}</li>
+                    <li key={alert.id}>
+                      <span className={`indicator-state status-${alert.level.toLowerCase()}`}>
+                        {alert.level === "INFO" ? "INFO" : statusLabels[alert.level]}
+                      </span>
+                      <strong>{alert.message}</strong>
+                      <span>{alert.systemName}</span>
+                      <time dateTime={alert.detectedAt}>
+                        {formatMeasurementDate(alert.detectedAt)}
+                      </time>
+                    </li>
                   ))}
                 </ul>
               )}
-            </div>
-            <span className="alert-count">
-              {dashboard.recentOpenAlerts.length.toString().padStart(2, "0")}
-            </span>
-            <a className="back-link" href="/alerts" onClick={navigate}>
-              Consulter toutes les alertes
-            </a>
           </section>
+          </div>
+          <section className="quick-actions" aria-labelledby="quick-actions-heading">
+            <h2 id="quick-actions-heading">Actions rapides</h2>
+            <div className="quick-action-grid">
+              {navigationItems.filter((item) => item.href !== "/").map((item) => (
+                <a key={item.href} href={item.href} onClick={navigate}>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d={item.icon} /></svg>
+                  <span>{item.href === "/systems" ? "Voir les systèmes" : item.href === "/alerts" ? "Voir les alertes" : "Consulter le journal"}</span>
+                  <span aria-hidden="true">→</span>
+                </a>
+              ))}
+            </div>
+          </section>
+          <footer className="dashboard-footer">
+            <span>AstroMate · Centre de contrôle</span>
+            <span>Explorer aujourd’hui. Un avenir plus sûr demain.</span>
+          </footer>
           </>
         )
       )}

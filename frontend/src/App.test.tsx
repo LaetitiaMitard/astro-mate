@@ -480,6 +480,91 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByText("Aucune alerte ouverte")).toBeInTheDocument();
   });
 
+  it.each([
+    ["life-support", "Support de vie"],
+    ["thermal-control", "Contrôle thermique"],
+    ["power-supply", "Alimentation électrique"],
+    ["communications", "Communications"],
+  ])("opens %s from the station illustration and restores the dashboard on back navigation", async (id, name) => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      const payload = url.endsWith("/measurements")
+        ? thermalTemperatureHistory
+        : url.endsWith("/systems/thermal-control")
+          ? thermalSystemDetail
+          : dashboard;
+      return Promise.resolve(new Response(JSON.stringify(payload)));
+    }));
+    render(<App />);
+    const station = await screen.findByRole("region", { name: "Vue de la station" });
+    const link = within(station).getByRole("link", { name: new RegExp(name) });
+    fireEvent.click(link);
+
+    expect(window.location.pathname).toBe(`/systems/${id}`);
+    expect(await screen.findByRole("heading", { name })).toBeInTheDocument();
+    const navigation = screen.getByRole("navigation", { name: "Navigation principale" });
+    expect(within(navigation).getByRole("link", { name: "Systèmes" }))
+      .toHaveAttribute("aria-current", "page");
+
+    act(() => {
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(await screen.findByRole("region", { name: "Vue de la station" }))
+      .toBeInTheDocument();
+    expect(within(navigation).getByRole("link", { name: "Tableau de bord" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("preserves native modified clicks on station links", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(dashboard))));
+    render(<App />);
+    const station = await screen.findByRole("region", { name: "Vue de la station" });
+    const link = within(station).getByRole("link", { name: /Support de vie/ });
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    // Éviter la navigation jsdom, après avoir observé le comportement React.
+    let preventedByApp = true;
+    const observeClick = (click: Event) => {
+      preventedByApp = click.defaultPrevented;
+      click.preventDefault();
+    };
+    document.addEventListener("click", observeClick, { once: true });
+    fireEvent(link, event);
+    expect(preventedByApp).toBe(false);
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("refreshes station states from telemetry and removes the illustration on API failure", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("EventSource", TestEventSource);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(dashboard)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ...dashboard,
+        stationStatus: "WARNING",
+        systemStatuses: dashboard.systemStatuses.map((system) =>
+          system.systemId === "thermal-control" ? { ...system, status: "WARNING" } : system,
+        ),
+      })))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch")));
+    await act(async () => { render(<App />); });
+    const navigation = screen.getByRole("navigation", { name: "Systèmes sur la station" });
+    expect(within(navigation).getByRole("link", { name: "Contrôle thermique NOMINAL" }))
+      .toBeInTheDocument();
+
+    await act(async () => {
+      TestEventSource.instance?.onmessage?.(new MessageEvent("message"));
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(within(navigation).getByRole("link", { name: "Contrôle thermique AVERTISSEMENT" }))
+      .toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Simulation indisponible");
+    expect(screen.queryByRole("region", { name: "Vue de la station" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Simulation active")).not.toBeInTheDocument();
+  });
+
   it("shows alert episodes and navigates through the API pages without manual actions", async () => {
     const alertsPage = (page: number) => ({
       items: page === 0
@@ -876,7 +961,13 @@ describe("AstroMate dashboard", () => {
       await screen.findByRole("region", { name: "État de la station" }),
     ).toBeInTheDocument();
     expect(screen.getByText("26,7")).toBeInTheDocument();
-    expect(screen.getAllByText("CRITIQUE")).toHaveLength(2);
+    const summary = screen.getByRole("region", { name: "État de la station" });
+    expect(within(summary).getByText("CRITIQUE")).toBeInTheDocument();
+    const card = screen.getByRole("heading", { name: "Température" }).closest("article")!;
+    expect(within(card).getByText("CRITIQUE")).toBeInTheDocument();
+    const station = screen.getByRole("region", { name: "Vue de la station" });
+    expect(within(station).getByRole("link", { name: "Contrôle thermique CRITIQUE" }))
+      .toBeInTheDocument();
   });
 
   it("names offline systems alongside the station status", async () => {
@@ -902,7 +993,8 @@ describe("AstroMate dashboard", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("HORS LIGNE")).toBeInTheDocument();
+    const summary = await screen.findByRole("region", { name: "État de la station" });
+    expect(within(summary).getByText("HORS LIGNE")).toBeInTheDocument();
     expect(
       screen.getByText("Systèmes hors ligne : Contrôle thermique"),
     ).toBeInTheDocument();

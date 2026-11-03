@@ -28,6 +28,16 @@ systèmes, alertes et journal. La rubrique courante est mise en évidence, y com
 sur les détails d’un système. Sur petit écran, le bouton « Menu » déplie cette
 navigation ; choisir une destination ou appuyer sur Échap la referme.
 
+Le tableau de bord reprend la maquette avec un fond clair, quatre cartes de
+mesures, les alertes ouvertes et des raccourcis vers les vues disponibles.
+L’image locale `frontend/src/assets/station.jpeg` permet d’ouvrir les
+quatre systèmes directement depuis leurs étiquettes, avec leur état courant.
+Les étiquettes et leurs flèches sont positionnées autour des modules comme sur
+la maquette et restent alignées lors du redimensionnement de l’image.
+Sur petit écran, ces liens sont disposés sous l’image pour rester lisibles et
+accessibles au clavier. L’image et les icônes sont intégrées localement :
+aucun service d’images externe n’est utilisé.
+
 ## Scénario thermique
 
 La simulation démarre automatiquement avec le backend et produit une télémétrie

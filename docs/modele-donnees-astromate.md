@@ -72,6 +72,10 @@ Le backend initialise les dernières mesures canoniques dans `metric_measurement
 
 Les échantillons horodatés sont conservés dans `measurement_history` sur les six dernières heures, avec la métrique source, sa valeur et son unité canonique. La série de température joint les mesures des deux radiateurs au même horodatage et en calcule la moyenne arrondie au dixième; aucune mesure agrégée distincte n’est enregistrée.
 
+### DataQualityEpisode
+
+Représente un épisode de mesures physiquement invalides encore en cours pour une métrique. L’épisode actif est conservé dans `measurement_data_quality_episode`, avec la métrique et l’horodatage de son premier échantillon invalide. Les répétitions ne produisent pas de nouvel événement; le premier échantillon valide clôt l’épisode et produit un événement DATA INFO, quel que soit son état de seuil.
+
 ### Alert
 
 Représente un épisode d’anomalie de métrique suivi de son ouverture à sa résolution.

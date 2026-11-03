@@ -54,11 +54,6 @@ class MeasurementService {
         if (metricKey == null || !RECORDABLE_METRICS.contains(metricKey)) {
             throw new IllegalArgumentException("Métrique non enregistrable : " + metricKey);
         }
-        if (!MetricStatusEvaluator.isPhysicallyValid(metricKey, canonicalValue)) {
-            throw new IllegalArgumentException(
-                    "La mesure est hors du domaine physique de " + metricKey
-            );
-        }
         if (measuredAt == null) {
             throw new IllegalArgumentException("L’horodatage de mesure est obligatoire.");
         }
@@ -83,12 +78,19 @@ class MeasurementService {
             throw new IllegalArgumentException("Métrique non initialisée : " + metricKey);
         }
         MetricSnapshot metric = previousMeasurements.get(0);
+        if (!MetricStatusEvaluator.isPhysicallyValid(metricKey, canonicalValue)) {
+            if (openDataQualityEpisode(metricKey, metric, measuredAt)) {
+                eventPublisher.publishEvent(new MeasurementChangeEvent());
+            }
+            return;
+        }
         if (measuredAt.isBefore(Instant.parse(metric.measuredAt()))) {
             throw new IllegalArgumentException(
                     "Une mesure ne peut pas remplacer une mesure plus récente pour "
                             + metricKey + "."
             );
         }
+        closeDataQualityEpisode(metricKey, metric, measuredAt);
 
         int updated = jdbcTemplate.update(
                 """
@@ -185,6 +187,56 @@ class MeasurementService {
             case UNKNOWN -> "inconnu";
             case OFFLINE -> "hors ligne";
         };
+    }
+
+    private boolean openDataQualityEpisode(
+            String metricKey,
+            MetricSnapshot metric,
+            Instant occurredAt
+    ) {
+        int inserted = jdbcTemplate.update(
+                """
+                INSERT OR IGNORE INTO measurement_data_quality_episode
+                    (metric_key, started_at)
+                VALUES (?, ?)
+                """,
+                metricKey,
+                occurredAt.toString()
+        );
+        if (inserted == 0) {
+            return false;
+        }
+        insertTechnicalEvent(
+                metricKey,
+                metric.systemId(),
+                "WARNING",
+                "Mesure invalide ignorée pour " + metric.name()
+                        + " : valeur hors du domaine physique.",
+                occurredAt,
+                "DATA"
+        );
+        return true;
+    }
+
+    private void closeDataQualityEpisode(
+            String metricKey,
+            MetricSnapshot metric,
+            Instant occurredAt
+    ) {
+        int deleted = jdbcTemplate.update(
+                "DELETE FROM measurement_data_quality_episode WHERE metric_key = ?",
+                metricKey
+        );
+        if (deleted == 1) {
+            insertTechnicalEvent(
+                    metricKey,
+                    metric.systemId(),
+                    "INFO",
+                    "Données valides rétablies pour " + metric.name() + ".",
+                    occurredAt,
+                    "DATA"
+            );
+        }
     }
 
     private void updateAlertEpisode(
@@ -295,15 +347,34 @@ class MeasurementService {
             String message,
             Instant occurredAt
     ) {
+        insertTechnicalEvent(
+                metricKey,
+                systemId,
+                level,
+                message,
+                occurredAt,
+                "ALERT"
+        );
+    }
+
+    private void insertTechnicalEvent(
+            String metricKey,
+            String systemId,
+            String level,
+            String message,
+            Instant occurredAt,
+            String category
+    ) {
         jdbcTemplate.update(
                 """
                 INSERT INTO station_event
                     (id, system_id, level, category, source, message, occurred_at)
-                VALUES (?, ?, ?, 'ALERT', ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 UUID.randomUUID().toString(),
                 systemId,
                 level,
+                category,
                 metricKey,
                 message,
                 occurredAt.toString()

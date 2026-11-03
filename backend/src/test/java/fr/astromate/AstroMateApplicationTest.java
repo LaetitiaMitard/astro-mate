@@ -49,6 +49,7 @@ class AstroMateApplicationTest {
     @BeforeEach
     void resetDashboardMeasurements() {
         jdbcTemplate.update("DELETE FROM measurement_history");
+        jdbcTemplate.update("DELETE FROM measurement_data_quality_episode");
         jdbcTemplate.update(
                 "UPDATE metric_measurement SET measured_at = '1970-01-01T00:00:00Z'"
         );
@@ -763,24 +764,94 @@ class AstroMateApplicationTest {
 
     @ParameterizedTest
     @CsvSource({
-            "oxygen, 101",
-            "carbonDioxide, -0.1",
-            "radiatorATemperature, -273.16",
-            "availableEnergy, 100.1",
-            "fluidFlow, -0.1",
-            "pressure, -0.1",
-            "thermalConsumption, -0.1"
+            "oxygen, life-support, oxygen-level, 21, 101",
+            "carbonDioxide, life-support, carbon-dioxide-level, 400, -0.1",
+            "radiatorATemperature, thermal-control, radiator-a-temperature, 22.1, -273.16",
+            "radiatorBTemperature, thermal-control, radiator-b-temperature, 22.4, -273.16",
+            "availableEnergy, power-supply, available-energy, 78, 100.1",
+            "fluidFlow, thermal-control, fluid-flow, 120, -0.1",
+            "pressure, thermal-control, pressure, 2.1, -0.1",
+            "thermalConsumption, thermal-control, thermal-consumption, 1.2, -0.1"
     })
-    void rejectsMeasurementsOutsideTheirPhysicalDomain(
+    void ignoresMeasurementsOutsideTheirPhysicalDomain(
             String metricKey,
+            String systemId,
+            String metricId,
+            double validValue,
             double value
     ) {
-        assertThatThrownBy(() -> recordMeasurement(metricKey, value))
-                .isInstanceOf(IllegalArgumentException.class);
-        if (metricKey.equals("oxygen")) {
-            assertThat(getDashboardIndicator("oxygen").path("value").asDouble())
-                    .isEqualTo(21);
-        }
+        Instant validAt = Instant.now();
+        Instant firstInvalidAt = validAt.plusSeconds(1);
+        measurementService.recordMeasurement(metricKey, validValue, validAt);
+        measurementService.recordMeasurement(metricKey, value, firstInvalidAt);
+        measurementService.recordMeasurement(
+                metricKey,
+                value,
+                firstInvalidAt.plusSeconds(1)
+        );
+
+        JsonNode metric = findById(
+                getSystemDetail(systemId).path("metrics"),
+                metricId
+        );
+        assertThat(metric.path("value").decimalValue())
+                .isEqualByComparingTo(Double.toString(validValue));
+        assertThat(Instant.parse(metric.path("measuredAt").asText())).isEqualTo(validAt);
+        assertThat(getDashboard().path("recentOpenAlerts")).isEmpty();
+
+        JsonNode dataEvents = getDataEvents(
+                validAt.minusSeconds(1),
+                firstInvalidAt.plusSeconds(10)
+        );
+        assertThat(dataEvents).hasSize(1);
+        assertThat(dataEvents.get(0).path("level").asText()).isEqualTo("WARNING");
+        assertThat(dataEvents.get(0).path("category").asText()).isEqualTo("DATA");
+        assertThat(Instant.parse(dataEvents.get(0).path("occurredAt").asText()))
+                .isEqualTo(firstInvalidAt);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "27, WARNING",
+            "31, CRITICAL"
+    })
+    void closesInvalidDataEpisodeWhenAnyPhysicallyValidMeasurementReturns(
+            double value,
+            String alertLevel
+    ) {
+        Instant invalidAt = Instant.now();
+        Instant recoveredAt = invalidAt.plusSeconds(1);
+        measurementService.recordMeasurement(
+                "radiatorATemperature",
+                -300,
+                invalidAt
+        );
+        measurementService.recordMeasurement(
+                "radiatorATemperature",
+                value,
+                recoveredAt
+        );
+
+        JsonNode metric = findById(
+                getSystemDetail("thermal-control").path("metrics"),
+                "radiator-a-temperature"
+        );
+        assertThat(metric.path("value").asDouble()).isEqualTo(value);
+        assertThat(Instant.parse(metric.path("measuredAt").asText())).isEqualTo(recoveredAt);
+        assertThat(getDashboard().path("recentOpenAlerts")).hasSize(1);
+        assertThat(getDashboard().path("recentOpenAlerts").get(0).path("level").asText())
+                .isEqualTo(alertLevel);
+
+        JsonNode dataEvents = getDataEvents(
+                invalidAt.minusSeconds(1),
+                recoveredAt.plusSeconds(10)
+        );
+        assertThat(dataEvents).hasSize(2);
+        assertThat(dataEvents.get(0).path("level").asText()).isEqualTo("WARNING");
+        assertThat(dataEvents.get(1).path("level").asText()).isEqualTo("INFO");
+        assertThat(dataEvents.get(1).path("category").asText()).isEqualTo("DATA");
+        assertThat(Instant.parse(dataEvents.get(1).path("occurredAt").asText()))
+                .isEqualTo(recoveredAt);
     }
 
     @Test
@@ -885,14 +956,31 @@ class AstroMateApplicationTest {
     }
 
     private JsonNode getThermalEvents() {
+        return getSystemDetail("thermal-control").path("recentEvents");
+    }
+
+    private JsonNode getSystemDetail(String systemId) {
         ResponseEntity<JsonNode> response = restTemplate.getForEntity(
-                "/api/v1/systems/thermal-control",
+                "/api/v1/systems/" + systemId,
                 JsonNode.class
         );
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-        JsonNode detail = response.getBody();
-        assertThat(detail).isNotNull();
-        return detail.path("recentEvents");
+        JsonNode body = response.getBody();
+        assertThat(body).isNotNull();
+        return body;
+    }
+
+    private JsonNode getDataEvents(Instant from, Instant to) {
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(
+                "/api/v1/events?from={from}&to={to}&category=DATA&sort=occurredAt,asc",
+                JsonNode.class,
+                from.toString(),
+                to.toString()
+        );
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        JsonNode body = response.getBody();
+        assertThat(body).isNotNull();
+        return body.path("items");
     }
 
     private String getSystemStatus(JsonNode dashboard, String systemId) {

@@ -29,6 +29,11 @@ CREATE TABLE IF NOT EXISTS measurement_history (
     PRIMARY KEY (metric_key, measured_at)
 );
 
+CREATE TABLE IF NOT EXISTS measurement_data_quality_episode (
+    metric_key TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS measurement_history_measured_at
     ON measurement_history(measured_at);
 

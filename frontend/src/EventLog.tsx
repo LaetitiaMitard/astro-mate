@@ -56,6 +56,8 @@ export default function EventLog() {
     "loading",
   );
   const periodError = getPeriodError(filters);
+  const canDisplayResults =
+    !periodError && loadState === "loaded" && result !== null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -231,74 +233,68 @@ export default function EventLog() {
         </section>
       )}
 
-      {!periodError &&
-        loadState === "loaded" &&
-        result &&
-        result.items.length === 0 && (
-          <p className="event-log-empty">
-            {hasFilters
-              ? "Aucun événement technique ne correspond à ces critères."
-              : "Aucun événement technique au cours des sept derniers jours."}
-          </p>
-        )}
+      {canDisplayResults && result.items.length === 0 && (
+        <p className="event-log-empty">
+          {hasFilters
+            ? "Aucun événement technique ne correspond à ces critères."
+            : "Aucun événement technique au cours des sept derniers jours."}
+        </p>
+      )}
 
-      {!periodError &&
-        loadState === "loaded" &&
-        result &&
-        result.items.length > 0 && (
-          <>
-            <div className="event-log-table-scroll">
-              <table
-                className="event-log-table"
-                aria-label="Événements techniques filtrés"
-              >
-                <thead>
-                  <tr>
-                    <th scope="col">Date et heure</th>
-                    <th scope="col">Niveau</th>
-                    <th scope="col">Catégorie</th>
-                    <th scope="col">Système</th>
-                    <th scope="col">Événement</th>
+      {canDisplayResults && result.items.length > 0 && (
+        <>
+          <div className="event-log-table-scroll">
+            <table
+              className="event-log-table"
+              aria-label="Événements techniques filtrés"
+            >
+              <thead>
+                <tr>
+                  <th scope="col">Date et heure</th>
+                  <th scope="col">Niveau</th>
+                  <th scope="col">Catégorie</th>
+                  <th scope="col">Système</th>
+                  <th scope="col">Événement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.items.map((event) => (
+                  <tr key={event.id}>
+                    <td>{formatMeasurementDate(event.occurredAt)}</td>
+                    <td>{event.level}</td>
+                    <td>{event.category}</td>
+                    <td>{event.systemName ?? "Station"}</td>
+                    <td>{event.message}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {result.items.map((event) => (
-                    <tr key={event.id}>
-                      <td>{formatMeasurementDate(event.occurredAt)}</td>
-                      <td>{event.level}</td>
-                      <td>{event.category}</td>
-                      <td>{event.systemName ?? "Station"}</td>
-                      <td>{event.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <nav className="event-log-pagination" aria-label="Pagination du journal">
+            <span>
+              Page {result.page + 1} sur {result.totalPages} ·{" "}
+              {result.totalElements} événement
+              {result.totalElements === 1 ? "" : "s"}
+            </span>
+            <div>
+              <button
+                type="button"
+                onClick={() => setPage((currentPage) => currentPage - 1)}
+                disabled={result.page === 0}
+              >
+                Précédent
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((currentPage) => currentPage + 1)}
+                disabled={result.page + 1 >= result.totalPages}
+              >
+                Suivant
+              </button>
             </div>
-            <nav className="event-log-pagination" aria-label="Pagination du journal">
-              <span>
-                Page {result.page + 1} sur {result.totalPages} ·{" "}
-                {result.totalElements} événement
-                {result.totalElements === 1 ? "" : "s"}
-              </span>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setPage((currentPage) => currentPage - 1)}
-                  disabled={result.page === 0}
-                >
-                  Précédent
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage((currentPage) => currentPage + 1)}
-                  disabled={result.page + 1 >= result.totalPages}
-                >
-                  Suivant
-                </button>
-              </div>
-            </nav>
-          </>
-        )}
+          </nav>
+        </>
+      )}
     </section>
   );
 }

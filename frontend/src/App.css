@@ -796,6 +796,42 @@ h1 {
   margin: 1.5rem 0;
 }
 
+.event-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.event-log-filters label {
+  display: grid;
+  gap: 0.4rem;
+  color: #91a3b8;
+  font-size: 0.8rem;
+}
+
+.event-log-filters select,
+.event-log-filters input {
+  min-width: 10rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #38506c;
+  border-radius: 0.45rem;
+  background: #172637;
+  color: #d8e8ff;
+  font: inherit;
+}
+
+.event-log-filters input[type="search"] {
+  min-width: 14rem;
+}
+
+.event-log-filters select:focus-visible,
+.event-log-filters input:focus-visible {
+  outline: 2px solid #8fc8ff;
+  outline-offset: 3px;
+}
+
 .alert-filters label {
   display: grid;
   gap: 0.4rem;

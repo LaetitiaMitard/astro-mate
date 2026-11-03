@@ -1,9 +1,41 @@
 import { useEffect, useState } from "react";
-import { getEvents, type EventLogPage } from "./dashboardApi";
+import {
+  getEvents,
+  type EventLogFilters,
+  type EventLogPage,
+  type TechnicalEvent,
+} from "./dashboardApi";
 import { formatMeasurementDate } from "./dashboardFormat";
+
+interface EventLogForm {
+  from: string;
+  to: string;
+  level: "" | TechnicalEvent["level"];
+  category: "" | TechnicalEvent["category"];
+  query: string;
+  sort: EventLogFilters["sort"];
+}
+
+const initialFilters: EventLogForm = {
+  from: "",
+  to: "",
+  level: "",
+  category: "",
+  query: "",
+  sort: "occurredAt,desc",
+};
+
+function toUtcIso(value: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : value;
+}
 
 export default function EventLog() {
   const [page, setPage] = useState(0);
+  const [filters, setFilters] = useState<EventLogForm>(initialFilters);
   const [result, setResult] = useState<EventLogPage | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "loaded" | "error">(
     "loading",
@@ -13,7 +45,18 @@ export default function EventLog() {
     const controller = new AbortController();
     setLoadState("loading");
 
-    getEvents(page, controller.signal)
+    getEvents(
+      page,
+      {
+        from: toUtcIso(filters.from),
+        to: toUtcIso(filters.to),
+        level: filters.level || undefined,
+        category: filters.category || undefined,
+        query: filters.query || undefined,
+        sort: filters.sort,
+      },
+      controller.signal,
+    )
       .then((events) => {
         setResult(events);
         setLoadState("loaded");
@@ -25,7 +68,19 @@ export default function EventLog() {
       });
 
     return () => controller.abort();
-  }, [page]);
+  }, [filters, page]);
+
+  function updateFilter<K extends keyof EventLogForm>(
+    key: K,
+    value: EventLogForm[K],
+  ) {
+    setFilters((currentFilters) => ({ ...currentFilters, [key]: value }));
+    setPage(0);
+  }
+
+  const hasFilters = Object.entries(filters).some(
+    ([key, value]) => key !== "sort" && value !== "",
+  );
 
   return (
     <section
@@ -39,8 +94,101 @@ export default function EventLog() {
         </div>
       </div>
       <p className="event-log-window">
-        Événements techniques des sept derniers jours
+        Période par défaut : les sept derniers jours · 20 événements maximum
+        par page
       </p>
+
+      <div className="event-log-filters" aria-label="Filtres et recherche du journal">
+        <label>
+          Période début (incluse)
+          <input
+            type="datetime-local"
+            value={filters.from}
+            onChange={(event) => updateFilter("from", event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          Période fin (exclue)
+          <input
+            type="datetime-local"
+            value={filters.to}
+            onChange={(event) => updateFilter("to", event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          Niveau
+          <select
+            value={filters.level}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              updateFilter(
+                "level",
+                value === "INFO" || value === "WARNING" || value === "CRITICAL"
+                  ? value
+                  : "",
+              );
+            }}
+          >
+            <option value="">Tous</option>
+            <option value="CRITICAL">CRITICAL</option>
+            <option value="WARNING">WARNING</option>
+            <option value="INFO">INFO</option>
+          </select>
+        </label>
+        <label>
+          Catégorie
+          <select
+            value={filters.category}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              updateFilter(
+                "category",
+                value === "SYSTEM" ||
+                  value === "ALERT" ||
+                  value === "MAINTENANCE" ||
+                  value === "OPERATION" ||
+                  value === "DATA"
+                  ? value
+                  : "",
+              );
+            }}
+          >
+            <option value="">Toutes</option>
+            <option value="SYSTEM">SYSTEM</option>
+            <option value="ALERT">ALERT</option>
+            <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="OPERATION">OPERATION</option>
+            <option value="DATA">DATA</option>
+          </select>
+        </label>
+        <label>
+          Recherche
+          <input
+            type="search"
+            value={filters.query}
+            maxLength={200}
+            onChange={(event) => updateFilter("query", event.currentTarget.value)}
+            placeholder="Message, source ou système"
+          />
+        </label>
+        <label>
+          Ordre chronologique
+          <select
+            value={filters.sort}
+            onChange={(event) =>
+              updateFilter(
+                "sort",
+                event.currentTarget.value === "occurredAt,asc"
+                  ? "occurredAt,asc"
+                  : "occurredAt,desc",
+              )
+            }
+          >
+            <option value="occurredAt,desc">Plus récents d’abord</option>
+            <option value="occurredAt,asc">Plus anciens d’abord</option>
+          </select>
+        </label>
+      </div>
 
       {loadState === "loading" && (
         <p className="loading" role="status">
@@ -59,7 +207,9 @@ export default function EventLog() {
 
       {loadState === "loaded" && result && result.items.length === 0 && (
         <p className="event-log-empty">
-          Aucun événement technique au cours des sept derniers jours.
+          {hasFilters
+            ? "Aucun événement technique ne correspond à ces critères."
+            : "Aucun événement technique au cours des sept derniers jours."}
         </p>
       )}
 
@@ -68,7 +218,7 @@ export default function EventLog() {
           <div className="event-log-table-scroll">
             <table
               className="event-log-table"
-              aria-label="Événements techniques des sept derniers jours"
+              aria-label="Événements techniques filtrés"
             >
               <thead>
                 <tr>

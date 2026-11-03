@@ -18,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 class EventLogService {
     private static final Duration EVENT_WINDOW = Duration.ofDays(7);
     private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_PAGE_SIZE = 20;
     private static final String DEFAULT_SORT = "occurredAt,desc";
     private static final Set<String> LEVELS = Set.of("INFO", "WARNING", "CRITICAL");
     private static final Set<String> CATEGORIES = Set.of(
@@ -58,7 +58,7 @@ class EventLogService {
         if (pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "La taille de page doit être comprise entre 1 et 100."
+                    "La taille de page doit être comprise entre 1 et 20."
             );
         }
         if (level != null && !LEVELS.contains(level)) {

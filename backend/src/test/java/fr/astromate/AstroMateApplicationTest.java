@@ -198,6 +198,65 @@ class AstroMateApplicationTest {
     }
 
     @Test
+    void searchesEventsInSourceAndSystemNameAndRejectsInvalidParameters() {
+        Instant now = Instant.now();
+        jdbcTemplate.update(
+                """
+                INSERT INTO station_event
+                    (id, system_id, level, category, source, message, occurred_at)
+                VALUES ('source-search', NULL, 'INFO', 'SYSTEM', 'Navigation Bus',
+                        'État stable', ?)
+                """,
+                now.minusSeconds(2).toString()
+        );
+        jdbcTemplate.update(
+                """
+                INSERT INTO station_event
+                    (id, system_id, level, category, source, message, occurred_at)
+                VALUES ('system-search', 'thermal-control', 'WARNING', 'DATA',
+                        'simulation', 'Température relevée', ?)
+                """,
+                now.minusSeconds(1).toString()
+        );
+
+        ResponseEntity<JsonNode> sourceSearch = restTemplate.getForEntity(
+                "/api/v1/events?q=nAVIGATION",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> allEvents = restTemplate.getForEntity(
+                "/api/v1/events",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> systemSearch = restTemplate.getForEntity(
+                "/api/v1/events?q=THERMIQUE",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> oversizedPage = restTemplate.getForEntity(
+                "/api/v1/events?pageSize=21",
+                JsonNode.class
+        );
+        ResponseEntity<JsonNode> invalidSort = restTemplate.getForEntity(
+                "/api/v1/events?sort=message,asc",
+                JsonNode.class
+        );
+        assertThat(sourceSearch.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(sourceSearch.getBody()).isNotNull();
+        assertThat(allEvents.getBody()).isNotNull();
+        assertThat(allEvents.getBody().path("items").findValuesAsText("id"))
+                .contains("source-search", "system-search");
+        assertThat(sourceSearch.getBody().path("items")).hasSize(1);
+        assertThat(sourceSearch.getBody().path("items").get(0).path("id").asText())
+                .isEqualTo("source-search");
+        assertThat(systemSearch.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(systemSearch.getBody()).isNotNull();
+        assertThat(systemSearch.getBody().path("items")).hasSize(1);
+        assertThat(systemSearch.getBody().path("items").get(0).path("id").asText())
+                .isEqualTo("system-search");
+        assertThat(oversizedPage.getStatusCode().value()).isEqualTo(400);
+        assertThat(invalidSort.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
     void servesOpenAndResolvedAlertsInPagesWithOpenAlertsFirst() {
         Instant now = Instant.now();
         for (int index = 0; index < 22; index++) {

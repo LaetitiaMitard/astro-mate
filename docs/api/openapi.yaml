@@ -187,7 +187,8 @@ paths:
       description: >-
         La période par défaut est constituée des sept derniers jours. La
         recherche libre porte sur le message, la source et le nom du système.
-        La taille de page par défaut est 20; l'export n'est pas disponible.
+        La pagination est limitée à 20 événements par page; l'export n'est pas
+        disponible.
       parameters:
         - name: from
           in: query
@@ -223,7 +224,7 @@ paths:
             enum: ['occurredAt,desc', 'occurredAt,asc']
             default: occurredAt,desc
         - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/EventPageSize'
       responses:
         '200':
           description: Page d'événements techniques
@@ -260,6 +261,15 @@ components:
         type: integer
         minimum: 1
         maximum: 100
+        default: 20
+    EventPageSize:
+      name: pageSize
+      in: query
+      description: Nombre d'événements par page, limité à 20.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 20
         default: 20
   responses:
     BadRequest:

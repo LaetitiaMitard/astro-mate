@@ -104,6 +104,15 @@ class EventLogServiceTest {
                 );
 
         assertThatThrownBy(() -> service.getEvents(
+                0, 21, null, null, null, null, null, null
+        ))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        exception -> assertThat(exception.getStatusCode())
+                                .isEqualTo(HttpStatus.BAD_REQUEST)
+                );
+
+        assertThatThrownBy(() -> service.getEvents(
                 0,
                 20,
                 "2026-10-21T12:00:00Z",
@@ -145,6 +154,43 @@ class EventLogServiceTest {
 
         assertThat(result.items()).extracting(SystemDetailResponse.Event::id)
                 .containsExactly("accented-message");
+    }
+
+    @Test
+    void searchesEventSourceAndSystemNameWithoutCaseSensitivity() {
+        Instant now = Instant.now();
+        insertEvent(
+                "source-match",
+                null,
+                "INFO",
+                "SYSTEM",
+                "Navigation Bus",
+                "État stable",
+                now.minusSeconds(2)
+        );
+        insertEvent(
+                "system-match",
+                "thermal-control",
+                "WARNING",
+                "DATA",
+                "simulation",
+                "Température relevée",
+                now.minusSeconds(1)
+        );
+
+        EventLogResponse sourceResult = service.getEvents(
+                0, 20, null, null, null, null, "nAVIGATION", null
+        );
+        EventLogResponse systemResult = service.getEvents(
+                0, 20, null, null, null, null, "CONTRÔLE THERMIQUE", null
+        );
+
+        assertThat(sourceResult.items())
+                .extracting(SystemDetailResponse.Event::id)
+                .containsExactly("source-match");
+        assertThat(systemResult.items())
+                .extracting(SystemDetailResponse.Event::id)
+                .containsExactly("system-match");
     }
 
     private void insertEvent(

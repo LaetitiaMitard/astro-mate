@@ -93,6 +93,15 @@ export interface EventLogPage {
   totalPages: number;
 }
 
+export interface EventLogFilters {
+  from?: string;
+  to?: string;
+  level?: TechnicalEvent["level"];
+  category?: TechnicalEvent["category"];
+  query?: string;
+  sort: "occurredAt,asc" | "occurredAt,desc";
+}
+
 export type AlertStatus = "OPEN" | "RESOLVED";
 export type AlertLevel = "INFO" | "WARNING" | "CRITICAL";
 
@@ -282,7 +291,7 @@ function isEventLogPage(value: unknown): value is EventLogPage {
   return (
     isRecord(value) &&
     Array.isArray(value.items) &&
-    value.items.length <= 100 &&
+    value.items.length <= 20 &&
     value.items.every(isTechnicalEvent) &&
     typeof value.page === "number" &&
     Number.isInteger(value.page) &&
@@ -290,7 +299,7 @@ function isEventLogPage(value: unknown): value is EventLogPage {
     typeof value.pageSize === "number" &&
     Number.isInteger(value.pageSize) &&
     value.pageSize >= 1 &&
-    value.pageSize <= 100 &&
+    value.pageSize <= 20 &&
     value.items.length <= value.pageSize &&
     typeof value.totalElements === "number" &&
     Number.isInteger(value.totalElements) &&
@@ -414,9 +423,30 @@ export async function getDashboard(signal: AbortSignal): Promise<Dashboard> {
 
 export async function getEvents(
   page: number,
+  filters: EventLogFilters,
   signal: AbortSignal,
 ): Promise<EventLogPage> {
-  const response = await fetch(`/api/v1/events?page=${page}`, { signal });
+  const parameters = new URLSearchParams({
+    page: page.toString(),
+    pageSize: "20",
+    sort: filters.sort,
+  });
+  if (filters.from) {
+    parameters.set("from", filters.from);
+  }
+  if (filters.to) {
+    parameters.set("to", filters.to);
+  }
+  if (filters.level) {
+    parameters.set("level", filters.level);
+  }
+  if (filters.category) {
+    parameters.set("category", filters.category);
+  }
+  if (filters.query) {
+    parameters.set("q", filters.query);
+  }
+  const response = await fetch(`/api/v1/events?${parameters}`, { signal });
 
   if (!response.ok) {
     throw new Error(`Event log request failed with status ${response.status}`);

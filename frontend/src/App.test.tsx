@@ -451,7 +451,7 @@ describe("AstroMate dashboard", () => {
     expect(screen.getByRole("button", { name: "Précédent" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Suivant" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/events?page=1",
+      "/api/v1/events?page=1&pageSize=20&sort=occurredAt%2Cdesc",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });

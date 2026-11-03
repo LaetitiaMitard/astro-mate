@@ -33,6 +33,21 @@ function toUtcIso(value: string): string | undefined {
   return Number.isFinite(date.getTime()) ? date.toISOString() : value;
 }
 
+function getPeriodError(filters: Pick<EventLogForm, "from" | "to">): string | null {
+  const from = filters.from ? new Date(filters.from).getTime() : null;
+  const to = filters.to ? new Date(filters.to).getTime() : null;
+  if (
+    (from !== null && !Number.isFinite(from)) ||
+    (to !== null && !Number.isFinite(to))
+  ) {
+    return "Les dates de la période doivent être valides.";
+  }
+  if (from !== null && to !== null && from >= to) {
+    return "La date de début doit précéder la date de fin.";
+  }
+  return null;
+}
+
 export default function EventLog() {
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<EventLogForm>(initialFilters);
@@ -40,9 +55,14 @@ export default function EventLog() {
   const [loadState, setLoadState] = useState<"loading" | "loaded" | "error">(
     "loading",
   );
+  const periodError = getPeriodError(filters);
 
   useEffect(() => {
     const controller = new AbortController();
+    if (periodError) {
+      setLoadState("loaded");
+      return;
+    }
     setLoadState("loading");
 
     getEvents(
@@ -68,7 +88,7 @@ export default function EventLog() {
       });
 
     return () => controller.abort();
-  }, [filters, page]);
+  }, [filters, page, periodError]);
 
   function updateFilter<K extends keyof EventLogForm>(
     key: K,
@@ -190,6 +210,12 @@ export default function EventLog() {
         </label>
       </div>
 
+      {periodError && (
+        <p className="event-log-validation" role="alert">
+          {periodError}
+        </p>
+      )}
+
       {loadState === "loading" && (
         <p className="loading" role="status">
           Lecture du journal technique…
@@ -205,68 +231,74 @@ export default function EventLog() {
         </section>
       )}
 
-      {loadState === "loaded" && result && result.items.length === 0 && (
-        <p className="event-log-empty">
-          {hasFilters
-            ? "Aucun événement technique ne correspond à ces critères."
-            : "Aucun événement technique au cours des sept derniers jours."}
-        </p>
-      )}
+      {!periodError &&
+        loadState === "loaded" &&
+        result &&
+        result.items.length === 0 && (
+          <p className="event-log-empty">
+            {hasFilters
+              ? "Aucun événement technique ne correspond à ces critères."
+              : "Aucun événement technique au cours des sept derniers jours."}
+          </p>
+        )}
 
-      {loadState === "loaded" && result && result.items.length > 0 && (
-        <>
-          <div className="event-log-table-scroll">
-            <table
-              className="event-log-table"
-              aria-label="Événements techniques filtrés"
-            >
-              <thead>
-                <tr>
-                  <th scope="col">Date et heure</th>
-                  <th scope="col">Niveau</th>
-                  <th scope="col">Catégorie</th>
-                  <th scope="col">Système</th>
-                  <th scope="col">Événement</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.items.map((event) => (
-                  <tr key={event.id}>
-                    <td>{formatMeasurementDate(event.occurredAt)}</td>
-                    <td>{event.level}</td>
-                    <td>{event.category}</td>
-                    <td>{event.systemName ?? "Station"}</td>
-                    <td>{event.message}</td>
+      {!periodError &&
+        loadState === "loaded" &&
+        result &&
+        result.items.length > 0 && (
+          <>
+            <div className="event-log-table-scroll">
+              <table
+                className="event-log-table"
+                aria-label="Événements techniques filtrés"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">Date et heure</th>
+                    <th scope="col">Niveau</th>
+                    <th scope="col">Catégorie</th>
+                    <th scope="col">Système</th>
+                    <th scope="col">Événement</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <nav className="event-log-pagination" aria-label="Pagination du journal">
-            <span>
-              Page {result.page + 1} sur {result.totalPages} ·{" "}
-              {result.totalElements} événement
-              {result.totalElements === 1 ? "" : "s"}
-            </span>
-            <div>
-              <button
-                type="button"
-                onClick={() => setPage((currentPage) => currentPage - 1)}
-                disabled={result.page === 0}
-              >
-                Précédent
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((currentPage) => currentPage + 1)}
-                disabled={result.page + 1 >= result.totalPages}
-              >
-                Suivant
-              </button>
+                </thead>
+                <tbody>
+                  {result.items.map((event) => (
+                    <tr key={event.id}>
+                      <td>{formatMeasurementDate(event.occurredAt)}</td>
+                      <td>{event.level}</td>
+                      <td>{event.category}</td>
+                      <td>{event.systemName ?? "Station"}</td>
+                      <td>{event.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </nav>
-        </>
-      )}
+            <nav className="event-log-pagination" aria-label="Pagination du journal">
+              <span>
+                Page {result.page + 1} sur {result.totalPages} ·{" "}
+                {result.totalElements} événement
+                {result.totalElements === 1 ? "" : "s"}
+              </span>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setPage((currentPage) => currentPage - 1)}
+                  disabled={result.page === 0}
+                >
+                  Précédent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((currentPage) => currentPage + 1)}
+                  disabled={result.page + 1 >= result.totalPages}
+                >
+                  Suivant
+                </button>
+              </div>
+            </nav>
+          </>
+        )}
     </section>
   );
 }

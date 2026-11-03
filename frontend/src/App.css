@@ -861,6 +861,11 @@ h1 {
   font-size: 0.88rem;
 }
 
+.event-log-validation {
+  margin: -0.75rem 0 1.5rem;
+  color: #e19b9e;
+}
+
 .event-log-table-scroll,
 .alert-log-table-scroll {
   overflow-x: auto;

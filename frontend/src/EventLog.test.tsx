@@ -148,4 +148,41 @@ describe("event log", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
+
+  it("reports an invalid period without requesting events", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const requestUrl = new URL(
+        typeof input === "string" ? input : input.toString(),
+        window.location.origin,
+      );
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(eventPage(Number(requestUrl.searchParams.get("page")))),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<EventLog />);
+    expect(await screen.findByText("Événement 0")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Période fin (exclue)"), {
+      target: { value: "2026-10-20T12:00" },
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const requestCount = fetchMock.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText("Période début (incluse)"), {
+      target: { value: "2026-10-21T12:00" },
+    });
+
+    expect(
+      await screen.findByRole("alert"),
+    ).toHaveTextContent("La date de début doit précéder la date de fin.");
+    expect(fetchMock).toHaveBeenCalledTimes(requestCount);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
 });

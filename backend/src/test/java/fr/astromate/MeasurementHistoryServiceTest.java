@@ -1,14 +1,16 @@
 package fr.astromate;
 
+import fr.astromate.application.model.ApplicationException;
+import fr.astromate.application.model.MeasurementSeriesView;
+import fr.astromate.application.service.MeasurementHistoryService;
+import fr.astromate.infrastructure.persistence.JdbcHistoryQueries;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,7 +35,7 @@ class MeasurementHistoryServiceTest {
                 )
                 """
         );
-        service = new MeasurementHistoryService(jdbcTemplate);
+        service = new MeasurementHistoryService(new JdbcHistoryQueries(jdbcTemplate), java.time.Clock.systemUTC());
     }
 
     @AfterEach
@@ -50,9 +52,9 @@ class MeasurementHistoryServiceTest {
                 null
         ))
                 .isInstanceOfSatisfying(
-                        ResponseStatusException.class,
-                        exception -> assertThat(exception.getStatusCode())
-                                .isEqualTo(HttpStatus.BAD_REQUEST)
+                        ApplicationException.class,
+                        exception -> assertThat(exception.kind())
+                                .isEqualTo(ApplicationException.Kind.BAD_REQUEST)
                 );
     }
 
@@ -67,9 +69,9 @@ class MeasurementHistoryServiceTest {
                 now.minusSeconds(1).toString()
         ))
                 .isInstanceOfSatisfying(
-                        ResponseStatusException.class,
-                        exception -> assertThat(exception.getStatusCode())
-                                .isEqualTo(HttpStatus.BAD_REQUEST)
+                        ApplicationException.class,
+                        exception -> assertThat(exception.kind())
+                                .isEqualTo(ApplicationException.Kind.BAD_REQUEST)
                 );
     }
 
@@ -83,7 +85,7 @@ class MeasurementHistoryServiceTest {
         insertTemperaturePair(inWindow, 21.4, 22.1);
         insertTemperaturePair(future, 24, 24);
 
-        MeasurementSeriesResponse series = service.getMeasurements(
+        MeasurementSeriesView series = service.getMeasurements(
                 "thermal-control",
                 "temperature",
                 null,
@@ -91,7 +93,7 @@ class MeasurementHistoryServiceTest {
         );
 
         assertThat(series.measurements()).containsExactly(
-                new MeasurementSeriesResponse.Measurement(21.8, inWindow.toString())
+                new MeasurementSeriesView.Measurement(21.8, inWindow.toString())
         );
         assertThat(Duration.between(
                 Instant.parse(series.from()),

@@ -83,7 +83,7 @@ suivants conservent les mesures, l’historique, les alertes et les événements
 existants, sans réensemencer un historique devenu vide.
 Aucun reset complet automatique n’est effectué.
 
-## Architecture prévue
+## Architecture
 
 - **Interface** : React, TypeScript et Vite.
 - **API locale** : Java 21 et Spring Boot 3.
@@ -94,6 +94,13 @@ En usage normal, l’application Spring Boot servira les fichiers compilés du
 frontend afin de démarrer AstroMate avec un seul processus. Les détails et
 contraintes sont décrits dans l’[ADR de la pile locale](docs/adr/0001-architecture-locale.md)
 et l’[ADR d’organisation du frontend](docs/adr/0002-architecture-frontend.md).
+
+Le backend suit une **architecture hexagonale légère**, sans dossiers `in` ou
+`out` : `domain` porte les modèles et règles métier, `application` les cas
+d’usage et leurs interfaces (`port`), et `infrastructure` les accès HTTP,
+SQLite, SSE, la planification et la configuration Spring. Le cœur ne dépend
+ni de Spring ni de JDBC. Ce découpage et ses compromis sont décrits dans
+l’[ADR d’architecture du backend](docs/adr/0003-architecture-backend.md).
 
 ## Documentation
 

@@ -1,12 +1,13 @@
 package fr.astromate;
 
+import fr.astromate.infrastructure.web.MeasurementChangeNotifier;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class MeasurementChangeNotifierTest {

@@ -1,13 +1,16 @@
 package fr.astromate;
 
+import fr.astromate.application.model.ApplicationException;
+import fr.astromate.application.model.EventLogView;
+import fr.astromate.application.model.SystemDetailView;
+import fr.astromate.application.service.EventLogService;
+import fr.astromate.infrastructure.persistence.JdbcEventQueries;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
-import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,7 +37,7 @@ class EventLogServiceTest {
                 )
                 """
         );
-        service = new EventLogService(jdbcTemplate);
+        service = new EventLogService(new JdbcEventQueries(jdbcTemplate), java.time.Clock.systemUTC());
     }
 
     @AfterEach
@@ -73,7 +76,7 @@ class EventLogServiceTest {
                 now.minusSeconds(3)
         );
 
-        EventLogResponse result = service.getEvents(
+        EventLogView result = service.getEvents(
                 0,
                 1,
                 now.minusSeconds(60).toString(),
@@ -98,18 +101,18 @@ class EventLogServiceTest {
                 0, 101, null, null, null, null, null, null
         ))
                 .isInstanceOfSatisfying(
-                        ResponseStatusException.class,
-                        exception -> assertThat(exception.getStatusCode())
-                                .isEqualTo(HttpStatus.BAD_REQUEST)
+                        ApplicationException.class,
+                        exception -> assertThat(exception.kind())
+                                .isEqualTo(ApplicationException.Kind.BAD_REQUEST)
                 );
 
         assertThatThrownBy(() -> service.getEvents(
                 0, 21, null, null, null, null, null, null
         ))
                 .isInstanceOfSatisfying(
-                        ResponseStatusException.class,
-                        exception -> assertThat(exception.getStatusCode())
-                                .isEqualTo(HttpStatus.BAD_REQUEST)
+                        ApplicationException.class,
+                        exception -> assertThat(exception.kind())
+                                .isEqualTo(ApplicationException.Kind.BAD_REQUEST)
                 );
 
         assertThatThrownBy(() -> service.getEvents(
@@ -123,9 +126,9 @@ class EventLogServiceTest {
                 null
         ))
                 .isInstanceOfSatisfying(
-                        ResponseStatusException.class,
-                        exception -> assertThat(exception.getStatusCode())
-                                .isEqualTo(HttpStatus.BAD_REQUEST)
+                        ApplicationException.class,
+                        exception -> assertThat(exception.kind())
+                                .isEqualTo(ApplicationException.Kind.BAD_REQUEST)
                 );
     }
 
@@ -141,7 +144,7 @@ class EventLogServiceTest {
                 Instant.now().minusSeconds(1)
         );
 
-        EventLogResponse result = service.getEvents(
+        EventLogView result = service.getEvents(
                 0,
                 20,
                 null,
@@ -152,7 +155,7 @@ class EventLogServiceTest {
                 null
         );
 
-        assertThat(result.items()).extracting(SystemDetailResponse.Event::id)
+        assertThat(result.items()).extracting(SystemDetailView.Event::id)
                 .containsExactly("accented-message");
     }
 
@@ -178,18 +181,18 @@ class EventLogServiceTest {
                 now.minusSeconds(1)
         );
 
-        EventLogResponse sourceResult = service.getEvents(
+        EventLogView sourceResult = service.getEvents(
                 0, 20, null, null, null, null, "nAVIGATION", null
         );
-        EventLogResponse systemResult = service.getEvents(
+        EventLogView systemResult = service.getEvents(
                 0, 20, null, null, null, null, "CONTRÔLE THERMIQUE", null
         );
 
         assertThat(sourceResult.items())
-                .extracting(SystemDetailResponse.Event::id)
+                .extracting(SystemDetailView.Event::id)
                 .containsExactly("source-match");
         assertThat(systemResult.items())
-                .extracting(SystemDetailResponse.Event::id)
+                .extracting(SystemDetailView.Event::id)
                 .containsExactly("system-match");
     }
 

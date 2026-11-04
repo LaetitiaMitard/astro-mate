@@ -1,6 +1,7 @@
 package fr.astromate;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import fr.astromate.application.service.ThermalSimulation;
 import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;

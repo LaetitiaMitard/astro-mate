@@ -1,5 +1,8 @@
 package fr.astromate;
 
+import fr.astromate.application.service.DataRetentionService;
+import fr.astromate.infrastructure.configuration.SpringTransactions;
+import fr.astromate.infrastructure.persistence.JdbcRetentionRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -53,7 +56,10 @@ class DataRetentionServiceTest {
                 )
                 """
         );
-        service = new DataRetentionService(jdbcTemplate);
+        service = new DataRetentionService(
+                new JdbcRetentionRepository(jdbcTemplate),
+                new SpringTransactions(new org.springframework.jdbc.datasource.DataSourceTransactionManager(dataSource)),
+                java.time.Clock.systemUTC());
     }
 
     @AfterEach

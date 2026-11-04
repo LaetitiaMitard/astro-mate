@@ -1,4 +1,4 @@
-import type { Dashboard } from "./dashboardApi";
+import type { Dashboard } from "../api/models";
 
 export function formatValue(value: number | null) {
   if (value === null) {

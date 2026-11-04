@@ -92,7 +92,8 @@ Aucun reset complet automatique n’est effectué.
 
 En usage normal, l’application Spring Boot servira les fichiers compilés du
 frontend afin de démarrer AstroMate avec un seul processus. Les détails et
-contraintes sont décrits dans l’[ADR d’architecture](docs/adr/0001-architecture-locale.md).
+contraintes sont décrits dans l’[ADR de la pile locale](docs/adr/0001-architecture-locale.md)
+et l’[ADR d’organisation du frontend](docs/adr/0002-architecture-frontend.md).
 
 ## Documentation
 

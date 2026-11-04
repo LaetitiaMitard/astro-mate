@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import App from "./App";
+import App from "./app/App";
 
 class TestEventSource {
   static instance: TestEventSource | null = null;

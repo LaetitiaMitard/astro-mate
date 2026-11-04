@@ -6,14 +6,16 @@ import {
 } from "react";
 import {
   getIndicatorMeasurements,
-  type MeasurementSeries,
-  type SystemDetail,
-} from "./dashboardApi";
+} from "../../shared/api/client";
+import type {
+  MeasurementSeries,
+  SystemDetail,
+} from "../../shared/api/models";
 import {
   formatMeasurementDate,
   formatRange,
   formatValue,
-} from "./dashboardFormat";
+} from "../../shared/lib/dashboardFormat";
 
 const statusLabels: Record<SystemDetail["status"], string> = {
   NOMINAL: "NOMINAL",

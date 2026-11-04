@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   getEvents,
-  type EventLogFilters,
-  type EventLogPage,
-  type TechnicalEvent,
-} from "./dashboardApi";
-import { formatMeasurementDate } from "./dashboardFormat";
+} from "../../shared/api/client";
+import type {
+  EventLogFilters,
+  EventLogPage,
+  TechnicalEvent,
+} from "../../shared/api/models";
+import { formatMeasurementDate } from "../../shared/lib/dashboardFormat";
 
 interface EventLogForm {
   from: string;

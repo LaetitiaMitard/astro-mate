@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import StationOverview from "./StationOverview";
-import type { SystemStatus } from "./dashboardApi";
+import type { SystemStatus } from "../../shared/api/models";
 
 const labels: Record<SystemStatus, string> = {
   NOMINAL: "NOMINAL",

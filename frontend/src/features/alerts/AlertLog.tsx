@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   getAlerts,
-  type AlertLevel,
-  type AlertPage,
-  type AlertStatus,
-} from "./dashboardApi";
-import { formatMeasurementDate } from "./dashboardFormat";
+} from "../../shared/api/client";
+import type {
+  AlertLevel,
+  AlertPage,
+  AlertStatus,
+} from "../../shared/api/models";
+import { formatMeasurementDate } from "../../shared/lib/dashboardFormat";
 
 const systems = [
   { id: "life-support", name: "Support de vie" },

@@ -1,7 +1,7 @@
 import { useId, type MouseEvent } from "react";
-import type { SystemStatus } from "./dashboardApi";
+import type { SystemStatus } from "../../shared/api/models";
 
-const stationImage = new URL("./assets/station.jpeg", import.meta.url).href;
+const stationImage = new URL("../../assets/station.jpeg", import.meta.url).href;
 
 interface StationOverviewProps {
   systems: { id: string; name: string; status: SystemStatus }[];

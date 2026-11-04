@@ -3,11 +3,14 @@
 ## Project shape
 
 - The README describes this repository as a project for an AI workshop.
-- The repository currently contains no application source or defined architecture. Inspect the checked-in code and configuration before making assumptions about the stack or system design.
+- The repository contains a React/TypeScript/Vite frontend in `frontend/` and a Java/Spring Boot backend in `backend/` for a local simulation. Inspect the checked-in code and configuration before making assumptions about the stack or system design.
+- The local stack and frontend organization decisions are documented in `docs/adr/0001-architecture-locale.md` and `docs/adr/0002-architecture-frontend.md`.
 
 ## Build, test, and lint
 
-- No build, test, or lint commands are configured in the repository yet. Once tooling is added, use the scripts and configuration checked into the repository; do not assume a framework-specific command.
+- Frontend tests and build: run `npm test` and `npm run build` from `frontend/`.
+- Full project verification: run `./mvnw verify` from `backend/`.
+- No standalone lint command is currently configured. Use the scripts and configuration checked into the repository; do not assume an unconfigured command.
 
 ## Project conventions
 

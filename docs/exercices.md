@@ -1,131 +1,103 @@
-# Exercices
+# Déroulé de la démo Copilot
 
-Cette fiche propose un parcours en quatre exercices à réaliser dans l’ordre.
+Cette démo suit un même fil rouge : donner du contexte à Copilot, enquêter sur
+un incident, prendre du recul sur l’échange, puis planifier et réaliser une
+évolution du tableau de bord. Chaque séquence s’appuie sur la précédente pour
+montrer un workflow continu plutôt qu’une série d’exercices indépendants.
+
 Les commandes `/init`, `/create-skill`, `/debug` et `/plan` sont celles de
-Copilot Chat : si une commande n’est pas disponible dans l’environnement de
-l’atelier, demander à l’assistant de suivre le même objectif sans prétendre
-qu’une commande a été exécutée.
+Copilot Chat : si une commande n’est pas disponible dans l’environnement de la
+démo, demander à l’assistant de suivre le même objectif sans prétendre qu’une
+commande a été exécutée.
 
-Pour les exercices de code, travailler dans un clone personnel ou une branche
-de travail, et ne pas modifier l’historique Git partagé. Les tests et commandes
-de validation du projet sont décrits dans le README.
+Pour toute modification de code, travailler dans un clone personnel ou une
+branche de travail, sans modifier l’historique Git partagé. Les commandes de
+développement et de validation du projet sont décrites dans le README.
 
-## Exercice 1 — Préparer les instructions du projet avec `/init`
+## 1. Donner à Copilot le contexte du projet
 
-### Objectif
+Ouvrir AstroMate à la racine du dépôt et lancer `/init`. Le fichier généré
+(par exemple `AGENTS.md`) sert de point de départ, pas de vérité automatique :
+le relire et le confronter au README et au code avant de l’utiliser.
 
-Utiliser la commande intégrée `/init` à l’arrivée sur le projet, puis améliorer
-le fichier d’instructions généré pour qu’il aide réellement Copilot à travailler
-sur AstroMate.
+Pendant la démo, vérifier que les instructions décrivent le projet réellement
+présent : frontend React/TypeScript/Vite, backend Java/Spring Boot, persistance
+locale, données de simulation fictives et commandes de validation documentées.
+Les compléter si nécessaire avec les règles utiles au travail de Copilot :
 
-### Étapes
+- pour un bug, commencer par un test qui reproduit le problème, puis conserver
+  un test de non-régression pour toute correction autorisée ;
+- pour une évolution, expliciter le comportement attendu et les tests concernés ;
+- avant de conclure, vérifier les critères d’acceptation, exécuter les contrôles
+  pertinents et ajuster la documentation si nécessaire ;
+- éviter les changements sans rapport avec le besoin et ne pas inventer
+  d’architecture, de scripts ou de règles métier.
 
-1. Ouvrir le dépôt AstroMate à sa racine et lancer `/init`.
-2. Lire le fichier d’instructions créé par Copilot (par exemple `AGENTS.md`).
-   Ne pas considérer le contenu généré comme automatiquement exact.
-3. Le confronter au README et au dépôt : architecture réellement présente,
-   commandes de développement et de validation, langue de la documentation,
-   limites de la simulation et éventuelles consignes déjà en place.
-4. Réviser le fichier pour supprimer les suppositions et ajouter les consignes
-   manquantes ci-dessous.
-5. Vérifier que les consignes sont assez précises pour guider une petite
-   modification et sa validation.
+**À montrer :** les instructions donnent un contexte vérifiable et aident
+Copilot à proposer des actions adaptées au dépôt, sans reprendre aveuglément
+son contenu généré.
 
-### Suggestion d'ajout
+## 2. Enquêter sur l’incident avec un skill
 
-- **TDD** : pour un bug, commencer par un test qui échoue et reproduit le
-  problème, corriger ensuite le code, puis conserver le test de non-régression.
-  Pour une évolution, définir le comportement attendu et les tests avant ou
-  pendant l’implémentation.
-- **Définition of Done (DoD)** : critères vérifiables avant de déclarer un
-  changement terminé — critères d’acceptation couverts, tests concernés
-  exécutés et réussis, documentation ajustée si nécessaire, aucun changement
-  sans rapport avec le besoin.
-  
-### A vérifier
+Ouvrir le [ticket incident](incidents.md), puis demander à `/create-skill` de
+créer un skill réutilisable pour rechercher l’origine d’une régression dans un
+dépôt. Relire le skill et s’assurer qu’il propose une démarche fondée sur des
+preuves : reproduire le symptôme, examiner les commits et leurs diffs, comparer
+un état fonctionnel à l’état observé, et séparer les faits vérifiés des
+hypothèses.
 
-- **Contexte du projet** : données fictives uniquement, aucune connexion à une
-  station ou à des services externes, et pas de nouvelle règle métier sans
-  besoin explicite.
-- **Validation** : reprendre les commandes réellement documentées dans le
-  README, sans inventer des scripts ou une architecture absents du dépôt.
+Dans une nouvelle requête, faire utiliser ce skill pour analyser l’incident.
+Demander le commit suspect (SHA et justification), puis vérifier le diagnostic
+dans l’historique et dans le code plutôt que de se fier au seul message de
+commit.
 
+**Point d’attention pour cette démo :** le comportement décrit par cet incident
+correspond à une régression volontaire de l’atelier. L’objectif est de la
+reproduire et de montrer comment étayer un diagnostic, pas de la corriger.
+Ne pas modifier le code ou les tests pour changer ou masquer ce comportement.
 
-## Exercice 2 — Retrouver et corriger une régression avec un skill
+**À montrer :** un skill réutilisable structure l’enquête, mais ne remplace ni
+la vérification humaine ni les éléments concrets de l’historique.
 
-### Objectif
+## 3. Débriefer l’échange avec `/debug`
 
-Créer avec `/create-skill` un skill réutilisable pour rechercher l’origine d’une
-régression dans l’historique, puis l’utiliser pour identifier le commit fautif
-et corriger le bug.
+Dans la conversation de l’enquête, lancer `/debug` et demander une analyse de la
+requête utilisée pour retrouver le commit. Examiner quelles informations du
+projet et du skill ont été prises en compte, ce qui a conduit au diagnostic,
+et quelles vérifications étaient nécessaires.
 
-### Ticket du bug
+**À montrer :** `/debug` sert à comprendre le cheminement d’une requête et à
+repérer les améliorations possibles, pas à tenir le diagnostic pour vrai sans
+le confronter au dépôt.
 
-Lire le [ticket incident dans `incidents.md`](incidents.md), qui décrit le
-symptôme, les étapes de reproduction, les comportements attendu et observé ainsi
-que l’impact.
+## 4. Planifier puis réaliser une évolution
 
-### Étapes de travail
+Passer du diagnostic à une évolution indépendante de l’incident : la feature
+« La mascotte Orbit accompagne le diagnostic », décrite dans le
+[`backlog`](backlog.md). Lancer `/plan` — ou sélectionner le mode « plan » — en
+fournissant la description de la feature et ses trois tickets, puis ajouter
+`/grill-me` si cette commande est disponible dans l’environnement.
 
-1. Dans Copilot Chat, lancer `/create-skill` et demander un skill de recherche
-   de régression adapté à ce dépôt.
-2. Relire le skill créé et le compléter pour qu’il demande au minimum de :
-   reproduire le symptôme avec un test, examiner les commits et leurs diffs,
-   comparer un état où le comportement fonctionne avec l’état défectueux,
-   fournir les éléments qui relient le commit au bug, puis vérifier la
-   correction avec le test de non-régression.
-3. Faire utiliser ce skill à Copilot sur l’incident de [`incidents.md`](incidents.md). Lui demander de
-   citer le commit suspect (SHA et raison) et de distinguer les faits vérifiés
-   des hypothèses.
-4. Vérifier le diagnostic dans l’historique et dans le code. Ne pas retenir un
-   commit uniquement parce que son message semble pertinent.
-5. Faire résoudre le bug à Coipilot
+Relire le plan avec le backlog : vérifier les critères d’acceptation, les
+fichiers et tests à explorer, l’ordre des dépendances et les limites de la
+feature. Faire préciser le plan avant de passer à l’implémentation s’il oublie
+un critère ou suppose un nouvel état métier, une nouvelle API ou une
+modification de la simulation.
 
-### Résultat attendu et critères de fin
+Une fois le plan cohérent, le faire appliquer. Lancer l’application et
+parcourir le tableau de bord, les états d’Orbit, le système mis en avant et la
+navigation au clavier. Vérifier également le respect de la réduction des
+animations et l’absence de ressources distantes. Utiliser les commandes de
+validation indiquées dans le README et signaler explicitement tout contrôle
+non exécuté.
 
-- Le skill est enregistré à l’emplacement reconnu par l’environnement de
-  l’atelier et contient une procédure réutilisable, pas uniquement la solution
-  de cet incident.
-- Le commit identifié est justifié par des éléments vérifiables : test,
-  changement pertinent et comparaison avec l’état précédent.
-- Tous les tests passent et l'application est opératrionnelle.
+**À montrer :** le plan transforme un besoin et ses contraintes en étapes
+vérifiables ; l’implémentation reste guidée par les critères du backlog et les
+tests, sans élargir le périmètre.
 
-## Exercice 3 — Analyser la requête avec `/debug`
+## Conclusion de la démo
 
-### Objectif
-
-Utiliser `/debug` pour comprendre ce qui s’est passé pendant la requête Copilot
-de l’exercice 2 : quelles informations ont été prises en compte, où le
-diagnostic a déraillé ou abouti, et quelles vérifications manquaient.
-
-### Étapes
-
-1. Dans la même conversation Copilot que l’exercice 2, lancer `/debug` et lui
-   demander d’analyser la requête ayant servi à rechercher le commit de la
-   régression.
-2. Constater l'utilisation du skill
-
-## Exercice 4 — Planifier et développer une feature avec `/plan`
-
-### Objectif
-
-Planifier puis développer la feature « La mascotte Orbit accompagne le
-diagnostic », décrite avec ses trois tickets, sa DoD et ses limites dans le
-[`backlog.md`](backlog.md).
-
-### Déroulement
-
-1. Lancer `/plan` ou séléctionnet le mode "plan" avec la description de la feature et des trois tickets de
-   [`backlog.md`](backlog.md) ajouter /grill-me à la fin.
-2. Relire le plan : vérifier qu’il respecte les limites, identifie les fichiers
-   et tests à explorer, découpe le travail dans l’ordre des dépendances et ne
-   suppose pas de nouvel état métier ou de nouvelle API.
-3. Faire préciser ou corriger le plan si un critère d’acceptation est oublié.
-   Ne commencer l’implémentation qu’une fois le plan cohérent.
-4. Quand vous êtes satisfait, appliquer le plan.
-5. Vérifier l'application en la lançant et effectuant quelques tests fonctionnels
-
-### Résultat attendu
-
-La feature satisfait les critères d’acceptation des trois tickets et la DoD
-définis dans [`backlog.md`](backlog.md), en respectant les limites indiquées.
+Revenir sur le fil complet : contexte fiable, enquête traçable, analyse de
+l’échange, puis plan et livraison d’une évolution. Terminer en relisant le diff
+et en vérifiant que le résultat respecte le backlog ainsi que les limites
+documentées.

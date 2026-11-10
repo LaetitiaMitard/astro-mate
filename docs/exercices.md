@@ -115,8 +115,10 @@ relire le diff d’Orbit : il travaille en lecture seule et vérifie le clavier,
 les technologies d’assistance, les couleurs et la réduction des animations.
 Pour montrer un garde-fou déterministe, activer le
 [hook de protection](demo/hooks/proteger-references.json) puis demander à
-l’agent de mettre à jour `docs/specifications.md` : la modification est refusée
-avant même d’être tentée.
+l’agent de mettre à jour `docs/specifications.md` : l’outil d’édition est
+bloqué avant toute écriture. Observer ensuite si l’agent tente de contourner
+le refus par une commande shell, que ce hook ne couvre pas : c’est l’occasion
+de discuter de la portée réelle d’un garde-fou.
 
 **À montrer :** le plan transforme un besoin et ses contraintes en étapes
 vérifiables ; l’implémentation reste guidée par les critères du backlog et les
@@ -138,7 +140,7 @@ tests, sans élargir le périmètre.
 | 1. Contexte du projet | Instructions, `/init`, contexte de l’agent |
 | 2. Enquête avec un skill | Skills, serveur MCP GitHub, vérifier le diff plutôt que le message de commit |
 | 3. Débrief avec `/debug` | Composition du contexte, prise de recul sur l’échange |
-| 4. Plan et évolution | Comprendre, spécifier (`/grill-me`, glossaire), planifier (`/plan`), implémenter sous contrôle des tests, relire (agent personnalisé), garde-fous (hook, `ArchitectureTest`) |
+| 4. Plan et évolution | Comprendre et clarifier (`/grill-me`), planifier (`/plan`), implémenter sous contrôle des tests, relire (agent personnalisé), garde-fou déterministe (hook) |
 | 5. Pour aller plus loin | Worktrees, délégation asynchrone, evals |
 
 ## Conclusion de la démo

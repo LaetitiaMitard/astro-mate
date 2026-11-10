@@ -27,11 +27,15 @@ cp docs/demo/mcp/mcp.json .vscode/mcp.json
 
 ## Notes
 
-- **Hook** : le script est en bash et ne couvre que les outils d’édition de
-  l’agent (`edit`, `create`, `str_replace_editor`, `apply_patch`). Une commande
-  shell qui modifierait ces fichiers n’est pas interceptée : c’est un bon point
-  de discussion sur la portée réelle d’un garde-fou. Format testé avec des
-  entrées d’exemple ; à valider dans Copilot CLI avant l’atelier.
+- **Hook** : conçu pour Copilot CLI (format `version: 1`, champs `toolName`
+  et `toolArgs`). Le script est en bash et n’examine que le fichier ciblé par
+  les outils d’édition de l’agent (`edit`, `create`, `str_replace_editor`,
+  `apply_patch`) : citer `docs/specifications.md` dans un autre fichier reste
+  autorisé. Une commande shell qui modifierait ces fichiers n’est pas
+  interceptée, ce qui ouvre la discussion sur la portée réelle d’un garde-fou.
+  Les hooks de VS Code utilisent d’autres noms d’outils et ne sont pas couverts.
+  Script testé sur des entrées d’exemple ; à valider dans Copilot CLI avant
+  l’atelier.
 - **Agent** : il n’a accès qu’aux outils `read` et `search`, ce qui illustre
   la limitation des permissions d’un agent spécialisé.
 - **MCP** : au premier lancement, VS Code demande de s’authentifier auprès de

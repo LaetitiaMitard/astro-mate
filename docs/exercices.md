@@ -16,9 +16,19 @@ développement et de validation du projet sont décrites dans le README.
 
 Avant la démo, vérifier que le clone dispose de l’historique Git complet
 (`git rev-parse --is-shallow-repository` doit répondre `false`) : l’enquête de
-la séquence 2 en dépend. Des assets Copilot prêts à l’emploi (skill, agent
-personnalisé, hook, configuration MCP) sont disponibles dans le
-[kit de démo](demo/README.md) ; ils ne sont pas actifs par défaut.
+la séquence 2 en dépend.
+
+Le dépôt fournit des assets Copilot actifs dès l’ouverture du projet :
+
+- le skill [`enquete-regression`](../.github/skills/enquete-regression/SKILL.md)
+  (séquence 2) ;
+- l’agent personnalisé
+  [`revue-accessibilite`](../.github/agents/revue-accessibilite.agent.md)
+  (séquence 4) ;
+- le hook [`proteger-references`](../.github/hooks/proteger-references.json),
+  qui refuse toute modification de `docs/specifications.md` et `docs/edb.md`
+  par les outils d’édition de l’agent (séquence 4). Il est écrit pour
+  Copilot CLI, en bash.
 
 ## 1. Donner à Copilot le contexte du projet
 
@@ -49,20 +59,16 @@ son contenu généré.
 
 ## 2. Enquêter sur l’incident avec un skill
 
-Ouvrir le [ticket incident](incidents.md), puis demander à `/create-skill` de
-créer un skill réutilisable pour rechercher l’origine d’une régression dans un
-dépôt. Relire le skill et s’assurer qu’il propose une démarche fondée sur des
-preuves : reproduire le symptôme, examiner les commits et leurs diffs, comparer
-un état fonctionnel à l’état observé, et séparer les faits vérifiés des
-hypothèses.
+Ouvrir le [ticket incident](incidents.md) et présenter le skill
+[`enquete-regression`](../.github/skills/enquete-regression/SKILL.md) fourni
+dans le dépôt. Vérifier qu’il propose une démarche fondée sur des preuves :
+reproduire le symptôme, examiner les commits et leurs diffs, comparer un état
+fonctionnel à l’état observé, et séparer les faits vérifiés des hypothèses.
 
-Si `/create-skill` n’est pas disponible, ou pour comparer avec le skill
-généré, une version de référence se trouve dans le
-[kit de démo](demo/skills/enquete-regression/SKILL.md).
-
-Variante MCP : publier l’incident en issue GitHub et demander à l’agent de le
-lire via le serveur MCP GitHub (intégré à Copilot CLI, ou configuré dans VS Code
-avec [`demo/mcp/mcp.json`](demo/mcp/mcp.json)) plutôt que dans le fichier.
+Pour montrer la création d’un skill, demander à `/create-skill` d’en générer
+un équivalent sous un autre nom, puis comparer les deux. Supprimer ensuite le
+skill généré pour éviter que deux skills concurrents se chargent sur la même
+tâche.
 
 Dans une nouvelle requête, faire utiliser ce skill pour analyser l’incident.
 Demander le commit suspect (SHA et justification), puis vérifier le diagnostic
@@ -109,12 +115,12 @@ animations et l’absence de ressources distantes. Utiliser les commandes de
 validation indiquées dans le README et signaler explicitement tout contrôle
 non exécuté.
 
-Pour la relecture, activer l’agent personnalisé
-[`revue-accessibilite`](demo/agents/revue-accessibilite.agent.md) et lui faire
+Pour la relecture, sélectionner l’agent personnalisé
+[`revue-accessibilite`](../.github/agents/revue-accessibilite.agent.md) et lui faire
 relire le diff d’Orbit : il travaille en lecture seule et vérifie le clavier,
 les technologies d’assistance, les couleurs et la réduction des animations.
-Pour montrer un garde-fou déterministe, activer le
-[hook de protection](demo/hooks/proteger-references.json) puis demander à
+Pour montrer un garde-fou déterministe, s’appuyer sur le
+[hook de protection](../.github/hooks/proteger-references.json) et demander à
 l’agent de mettre à jour `docs/specifications.md` : l’outil d’édition est
 bloqué avant toute écriture. Observer ensuite si l’agent tente de contourner
 le refus par une commande shell, que ce hook ne couvre pas : c’est l’occasion
@@ -130,7 +136,8 @@ tests, sans élargir le périmètre.
   Git dédié, ou la déléguer en arrière-plan, pendant que l’enquête de la
   séquence 2 se poursuit dans la session principale.
 - **Évaluer un skill** : rejouer l’enquête dans deux sessions neuves, avec et
-  sans le skill `enquete-regression`, puis comparer la justesse du commit
+  sans le skill `enquete-regression` (dossier retiré temporairement dans une
+  branche de travail), puis comparer la justesse du commit
   identifié, la qualité des preuves et le nombre d’étapes.
 
 ## Correspondance avec la présentation
@@ -138,7 +145,7 @@ tests, sans élargir le périmètre.
 | Séquence | Notions illustrées |
 |---|---|
 | 1. Contexte du projet | Instructions, `/init`, contexte de l’agent |
-| 2. Enquête avec un skill | Skills, serveur MCP GitHub, vérifier le diff plutôt que le message de commit |
+| 2. Enquête avec un skill | Skills, vérifier le diff plutôt que le message de commit |
 | 3. Débrief avec `/debug` | Composition du contexte, prise de recul sur l’échange |
 | 4. Plan et évolution | Comprendre et clarifier (`/grill-me`), planifier (`/plan`), implémenter sous contrôle des tests, relire (agent personnalisé), garde-fou déterministe (hook) |
 | 5. Pour aller plus loin | Worktrees, délégation asynchrone, evals |

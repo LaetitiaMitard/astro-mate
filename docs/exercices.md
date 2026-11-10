@@ -1,158 +1,274 @@
-# Déroulé de la démo Copilot
+# Déroulé des démos Copilot
 
-Cette démo suit un même fil rouge : donner du contexte à Copilot, enquêter sur
-un incident, prendre du recul sur l’échange, puis planifier et réaliser une
-évolution du tableau de bord. Chaque séquence s’appuie sur la précédente pour
-montrer un workflow continu plutôt qu’une série d’exercices indépendants.
+Ce document décrit les démonstrations en direct qui accompagnent la
+présentation « Initiation à l’IA agentique ». Elles suivent l’ordre des slides :
+chaque démo correspond à une slide marquée « ▶ Démo » et s’appuie sur la
+précédente.
 
-Les commandes `/init`, `/create-skill`, `/debug` et `/plan` sont celles de
-Copilot Chat : si une commande n’est pas disponible dans l’environnement de la
-démo, demander à l’assistant de suivre le même objectif sans prétendre qu’une
-commande a été exécutée.
+Les démos de la partie 4 font passer une même évolution, la mascotte Orbit du
+[backlog](backlog.md), par toutes les étapes du parcours. La partie 5 rejoue
+ensuite cette évolution en mode délégué pour comparer les deux approches.
 
-Pour toute modification de code, travailler dans un clone personnel ou une
-branche de travail, sans modifier l’historique Git partagé. Les commandes de
-développement et de validation du projet sont décrites dans le README.
+## Vue d’ensemble
 
-Avant la démo, vérifier que le clone dispose de l’historique Git complet
-(`git rev-parse --is-shallow-repository` doit répondre `false`) : l’enquête de
-la séquence 2 en dépend.
+| Démo | Partie | Slide | Ce qu’on montre |
+|---|---|---|---|
+| 1 | 1 · Bases de l’IA | Que contient le contexte d’un agent ? | `/context` sur une première question |
+| 2 | 2 · Assets IA | Les instructions | Les instructions du dépôt, puis `/init` |
+| 3 | 2 · Assets IA | Les skills | Le skill `enquete-regression` sur l’incident |
+| 4 | 2 · Assets IA | Les agents personnalisés | L’agent `revue-accessibilite` en lecture seule |
+| 5 | 2 · Assets IA | Les hooks | Le hook qui protège les documents de référence |
+| 6 | 4 · Ingénierie | Comprendre le besoin | `grill-me` sur la feature Orbit |
+| 7 | 4 · Ingénierie | Planifier | `/plan` sur la feature Orbit |
+| 8 | 4 · Ingénierie | Implémenter sous contrôle des tests | Les tests d’Orbit d’abord, puis le code |
+| 9 | 4 · Ingénierie | Relire et passer le relais | La revue du diff d’Orbit |
+| 10 | 5 · Concepts avancés | Les worktrees Git, La délégation asynchrone | Orbit délégué dans un worktree |
+| 11 | 5 · Concepts avancés | Les evals | L’enquête avec et sans le skill |
 
-Le dépôt fournit des assets Copilot actifs dès l’ouverture du projet :
+La partie 3 (interfaces et commandes) et la slide MCP n’ont pas de démo
+dédiée : les commandes de la partie 3 sont utilisées au fil des autres démos.
 
-- le skill [`enquete-regression`](../.github/skills/enquete-regression/SKILL.md)
-  (séquence 2) ;
-- l’agent personnalisé
-  [`revue-accessibilite`](../.github/agents/revue-accessibilite.agent.md)
-  (séquence 4) ;
-- le hook [`proteger-references`](../.github/hooks/proteger-references.json),
-  qui refuse toute modification de `docs/specifications.md` et `docs/edb.md`
-  par les outils d’édition de l’agent (séquence 4). Il est écrit pour
-  Copilot CLI, en bash.
+## Préparation
 
-## 1. Donner à Copilot le contexte du projet
+- **Outils** : Java 21, Node.js 20 ou ultérieur, Copilot CLI et VS Code avec
+  Copilot. Les démos sont écrites pour Copilot CLI ; le hook de la démo 5 ne
+  fonctionne qu’avec lui.
+- **Historique Git complet** : `git rev-parse --is-shallow-repository` doit
+  répondre `false`, sinon l’enquête de la démo 3 est impossible.
+- **Application** : vérifier avant l’atelier que `./mvnw verify` passe depuis
+  `backend/` et que l’application démarre (voir le README).
+- **Branche de travail** : faire les démos sur une branche dédiée, par exemple
+  `demo/atelier`, sans modifier l’historique partagé.
+- **Commandes** : vérifier que `/context`, `/init`, `/plan`, `/agent`,
+  `/create-skill` et `/delegate` sont disponibles dans la version de Copilot
+  utilisée. Si une commande manque, demander le même objectif en langage
+  naturel, sans prétendre qu’elle a été exécutée.
 
-Ouvrir AstroMate à la racine du dépôt et lancer `/init`. Le fichier généré
-(par exemple `AGENTS.md`) sert de point de départ, pas de vérité automatique :
-le relire et le confronter au README et au code avant de l’utiliser.
+Assets fournis dans `.github/`, actifs dès l’ouverture du projet :
 
-Pendant la démo, vérifier que les instructions décrivent le projet réellement
-présent : frontend React/TypeScript/Vite, backend Java/Spring Boot, persistance
-locale, données de simulation fictives et commandes de validation documentées.
-Les compléter si nécessaire avec les règles utiles au travail de Copilot :
+- [`copilot-instructions.md`](../.github/copilot-instructions.md) : instructions
+  du dépôt ;
+- [`skills/enquete-regression/`](../.github/skills/enquete-regression/SKILL.md) :
+  démarche d’enquête sur une régression ;
+- [`skills/grill-me/`](../.github/skills/grill-me/SKILL.md) : clarification
+  d’un besoin par questions successives ;
+- [`agents/revue-accessibilite.agent.md`](../.github/agents/revue-accessibilite.agent.md) :
+  relecteur accessibilité en lecture seule ;
+- [`hooks/proteger-references.json`](../.github/hooks/proteger-references.json) :
+  refuse toute modification de `docs/specifications.md` et `docs/edb.md` par
+  les outils d’édition de l’agent.
 
-- pour un bug, commencer par un test qui reproduit le problème, puis conserver
-  un test de non-régression pour toute correction autorisée ;
-- pour une évolution, expliciter le comportement attendu et les tests concernés ;
-- avant de conclure, vérifier les critères d’acceptation, exécuter les contrôles
-  pertinents et ajuster la documentation si nécessaire ;
-- éviter les changements sans rapport avec le besoin et ne pas inventer
-  d’architecture, de scripts ou de règles métier.
+**Régression volontaire.** Le comportement décrit dans le
+[ticket incident](incidents.md) est une régression introduite pour l’atelier :
+les démos la diagnostiquent, mais ne la corrigent jamais.
 
-Le dépôt contient déjà `.github/copilot-instructions.md` : comparer ce
-fichier avec celui généré par `/init` montre ce qu’apporte un fichier
-d’instructions maintenu par l’équipe, et ce qui manque à un fichier généré.
+---
 
-**À montrer :** les instructions donnent un contexte vérifiable et aident
-Copilot à proposer des actions adaptées au dépôt, sans reprendre aveuglément
-son contenu généré.
+## Partie 1 · Bases de l’IA
 
-## 2. Enquêter sur l’incident avec un skill
+### Démo 1 — Ce que contient le contexte
 
-Ouvrir le [ticket incident](incidents.md) et présenter le skill
-[`enquete-regression`](../.github/skills/enquete-regression/SKILL.md) fourni
-dans le dépôt. Vérifier qu’il propose une démarche fondée sur des preuves :
-reproduire le symptôme, examiner les commits et leurs diffs, comparer un état
-fonctionnel à l’état observé, et séparer les faits vérifiés des hypothèses.
+**Slide :** « Que contient le contexte d’un agent ? »
 
-Pour montrer la création d’un skill, demander à `/create-skill` d’en générer
-un équivalent sous un autre nom, puis comparer les deux. Supprimer ensuite le
-skill généré pour éviter que deux skills concurrents se chargent sur la même
-tâche.
+1. Lancer Copilot CLI à la racine du dépôt.
+2. Avant toute question, lancer `/context` : les instructions de départ, la
+   description des outils et `copilot-instructions.md` occupent déjà de la
+   place.
+3. Demander : « Explique en cinq lignes l’architecture du backend
+   d’AstroMate. »
+4. Relancer `/context` : l’historique et les fichiers lus par l’agent ont
+   fait grossir le contexte.
 
-Dans une nouvelle requête, faire utiliser ce skill pour analyser l’incident.
-Demander le commit suspect (SHA et justification), puis vérifier le diagnostic
-dans l’historique et dans le code plutôt que de se fier au seul message de
-commit.
+**À montrer :** le contexte n’est pas qu’une conversation. Chaque fichier lu
+et chaque résultat d’outil s’y accumulent.
 
-**Point d’attention pour cette démo :** le comportement décrit par cet incident
-correspond à une régression volontaire de l’atelier. L’objectif est de la
-reproduire et de montrer comment étayer un diagnostic, pas de la corriger.
-Ne pas modifier le code ou les tests pour changer ou masquer ce comportement.
+---
 
-**À montrer :** un skill réutilisable structure l’enquête, mais ne remplace ni
-la vérification humaine ni les éléments concrets de l’historique.
+## Partie 2 · Assets IA
 
-## 3. Débriefer l’échange avec `/debug`
+### Démo 2 — Les instructions
 
-Dans la conversation de l’enquête, lancer `/debug` et demander une analyse de la
-requête utilisée pour retrouver le commit. Examiner quelles informations du
-projet et du skill ont été prises en compte, ce qui a conduit au diagnostic,
-et quelles vérifications étaient nécessaires.
+**Slide :** « Les instructions »
 
-**À montrer :** `/debug` sert à comprendre le cheminement d’une requête et à
-repérer les améliorations possibles, pas à tenir le diagnostic pour vrai sans
-le confronter au dépôt.
+1. Ouvrir [`.github/copilot-instructions.md`](../.github/copilot-instructions.md)
+   et le commenter : forme du projet, commandes de build et de test,
+   conventions, consigne sur la régression volontaire.
+2. Lancer `/init`. Le fichier généré (par exemple `AGENTS.md`, ignoré par Git)
+   est un point de départ, pas une vérité.
+3. Comparer les deux fichiers : qu’a deviné `/init`, qu’a-t-il manqué, qu’a-t-il
+   inventé ?
 
-## 4. Planifier puis réaliser une évolution
+**À montrer :** des instructions maintenues par l’équipe apportent des règles
+qu’un fichier généré ne peut pas deviner. Chaque ligne consomme du contexte à
+chaque requête (démo 1).
 
-Passer du diagnostic à une évolution indépendante de l’incident : la feature
-« La mascotte Orbit accompagne le diagnostic », décrite dans le
-[`backlog`](backlog.md). Lancer `/plan` — ou sélectionner le mode « plan » — en
-fournissant la description de la feature et ses trois tickets, puis ajouter
-`/grill-me` si cette commande est disponible dans l’environnement.
+### Démo 3 — Un skill d’enquête
 
-Relire le plan avec le backlog : vérifier les critères d’acceptation, les
-fichiers et tests à explorer, l’ordre des dépendances et les limites de la
-feature. Faire préciser le plan avant de passer à l’implémentation s’il oublie
-un critère ou suppose un nouvel état métier, une nouvelle API ou une
-modification de la simulation.
+**Slide :** « Les skills »
 
-Une fois le plan cohérent, le faire appliquer. Lancer l’application et
-parcourir le tableau de bord, les états d’Orbit, le système mis en avant et la
-navigation au clavier. Vérifier également le respect de la réduction des
-animations et l’absence de ressources distantes. Utiliser les commandes de
-validation indiquées dans le README et signaler explicitement tout contrôle
-non exécuté.
+1. Ouvrir le [ticket incident](incidents.md) et présenter le skill
+   [`enquete-regression`](../.github/skills/enquete-regression/SKILL.md) : sa
+   description, sa démarche et le rapport attendu.
+2. Dans une nouvelle session, demander : « Analyse l’incident décrit dans
+   docs/incidents.md et identifie le commit qui l’a introduit, avec le SHA et
+   la preuve. » Sans le nommer, l’agent doit charger le skill à partir de sa
+   description.
+3. Vérifier le diagnostic soi-même avec `git show` sur le commit proposé : le
+   diff doit expliquer le symptôme, le message de commit ne suffit pas.
+4. Optionnel : demander à `/create-skill` de générer un skill équivalent sous un
+   autre nom, comparer les deux, puis supprimer le skill généré pour éviter
+   deux skills concurrents.
 
-Pour la relecture, sélectionner l’agent personnalisé
-[`revue-accessibilite`](../.github/agents/revue-accessibilite.agent.md) et lui faire
-relire le diff d’Orbit : il travaille en lecture seule et vérifie le clavier,
-les technologies d’assistance, les couleurs et la réduction des animations.
-Pour montrer un garde-fou déterministe, s’appuyer sur le
-[hook de protection](../.github/hooks/proteger-references.json) et demander à
-l’agent de mettre à jour `docs/specifications.md` : l’outil d’édition est
-bloqué avant toute écriture. Observer ensuite si l’agent tente de contourner
-le refus par une commande shell, que ce hook ne couvre pas : c’est l’occasion
-de discuter de la portée réelle d’un garde-fou.
+**À montrer :** le skill structure l’enquête, mais le diagnostic se vérifie
+dans l’historique. Ne rien corriger.
 
-**À montrer :** le plan transforme un besoin et ses contraintes en étapes
-vérifiables ; l’implémentation reste guidée par les critères du backlog et les
-tests, sans élargir le périmètre.
+### Démo 4 — Un agent personnalisé en lecture seule
 
-## 5. Pour aller plus loin (optionnel)
+**Slide :** « Les agents personnalisés »
 
-- **Travail en parallèle** : lancer l’implémentation d’Orbit dans un worktree
-  Git dédié, ou la déléguer en arrière-plan, pendant que l’enquête de la
-  séquence 2 se poursuit dans la session principale.
-- **Évaluer un skill** : rejouer l’enquête dans deux sessions neuves, avec et
-  sans le skill `enquete-regression` (dossier retiré temporairement dans une
-  branche de travail), puis comparer la justesse du commit
-  identifié, la qualité des preuves et le nombre d’étapes.
+1. Présenter [`revue-accessibilite.agent.md`](../.github/agents/revue-accessibilite.agent.md) :
+   son rôle, ses consignes et ses outils limités à `read` et `search`.
+2. Le sélectionner avec `/agent`, puis demander : « Relis l’accessibilité du
+   tableau de bord : frontend/src/features/dashboard/. »
+3. Lui demander ensuite de corriger un des points relevés : il ne peut pas
+   modifier de fichier.
 
-## Correspondance avec la présentation
+**À montrer :** limiter les outils d’un agent est un vrai garde-fou. Cet agent
+reviendra à la démo 9 pour relire Orbit.
 
-| Séquence | Notions illustrées |
-|---|---|
-| 1. Contexte du projet | Instructions, `/init`, contexte de l’agent |
-| 2. Enquête avec un skill | Skills, vérifier le diff plutôt que le message de commit |
-| 3. Débrief avec `/debug` | Composition du contexte, prise de recul sur l’échange |
-| 4. Plan et évolution | Comprendre et clarifier (`/grill-me`), planifier (`/plan`), implémenter sous contrôle des tests, relire (agent personnalisé), garde-fou déterministe (hook) |
-| 5. Pour aller plus loin | Worktrees, délégation asynchrone, evals |
+### Démo 5 — Un hook de protection
 
-## Conclusion de la démo
+**Slide :** « Les hooks »
 
-Revenir sur le fil complet : contexte fiable, enquête traçable, analyse de
-l’échange, puis plan et livraison d’une évolution. Terminer en relisant le diff
-et en vérifiant que le résultat respecte le backlog ainsi que les limites
-documentées.
+1. Présenter [`proteger-references.json`](../.github/hooks/proteger-references.json)
+   et son script : un hook `preToolUse` qui examine le fichier ciblé par les
+   outils d’édition.
+2. Demander à l’agent : « Ajoute une section sur la mascotte Orbit dans
+   docs/specifications.md. » L’édition est refusée avant toute écriture, avec
+   le motif renvoyé par le hook.
+3. Observer si l’agent tente de contourner le refus par une commande shell.
+   Le hook ne couvre pas ce cas : c’est la permission demandée pour la
+   commande qui fait barrage.
+
+**À montrer :** un hook s’exécute à chaque fois, sans dépendre de la bonne
+volonté du modèle, mais il ne protège que ce qu’il couvre.
+
+---
+
+## Partie 4 · Méthodes d’ingénierie : la feature Orbit
+
+Les démos 6 à 9 font passer la feature « La mascotte Orbit accompagne le
+diagnostic » du [backlog](backlog.md) par le parcours de la présentation. Le
+backlog joue le rôle de spécification : objectif, trois tickets, critères
+d’acceptation, définition de terminé et limites.
+
+### Démo 6 — Comprendre le besoin
+
+**Slide :** « Comprendre le besoin »
+
+1. Dans une nouvelle session, demander : « Utilise grill-me sur la feature
+   Orbit de docs/backlog.md. »
+2. Répondre aux questions de l’agent, une à la fois. Exemples attendus : quel
+   système mettre en avant si plusieurs sont dégradés, que faire si l’état est
+   inconnu, quel ton pour les messages.
+3. Montrer le [glossaire](../GLOSSARY.md) : l’agent doit employer les mots du
+   métier (système, état, alerte) et non des synonymes ambigus.
+
+**À montrer :** l’agent pose les questions au lieu de deviner. Le résultat est
+un besoin clarifié, sans ligne de code.
+
+### Démo 7 — Planifier
+
+**Slide :** « Planifier : du quoi au comment »
+
+1. Lancer `/plan` avec la feature Orbit et ses trois tickets, en joignant les
+   réponses de la démo 6.
+2. Relire le plan avec le backlog : critères d’acceptation couverts, fichiers
+   et tests à créer, ordre des tickets, respect des limites (pas de nouvelle
+   API, pas de nouvel état métier, pas de modification de la simulation).
+3. Faire corriger le plan s’il oublie un critère ou sort du périmètre.
+
+**À montrer :** on corrige le plan, pas le code. Une mauvaise direction coûte
+ici quelques secondes.
+
+### Démo 8 — Implémenter sous contrôle des tests
+
+**Slide :** « Implémenter sous contrôle des tests »
+
+1. Faire écrire d’abord les tests du ticket 1 : une réaction pour chaque état
+   global (NOMINAL, WARNING, CRITICAL, OFFLINE, UNKNOWN), le système mis en
+   avant et le cas sans système.
+2. Lancer `npm test` depuis `frontend/` : les nouveaux tests échouent.
+3. Demander l’implémentation « pour que les tests passent, sans modifier les
+   tests », puis relancer `npm test`.
+4. Enchaîner sur les tickets 2 et 3 si le temps le permet. Sinon, s’en tenir
+   au ticket 1 en direct.
+
+**À montrer :** les tests sont un juge objectif. Vérifier dans le diff que
+l’agent n’a pas modifié les tests pour les faire passer.
+
+### Démo 9 — Relire avant de livrer
+
+**Slide :** « Relire et passer le relais »
+
+1. Sélectionner l’agent `revue-accessibilite` (démo 4) et lui faire relire le
+   diff d’Orbit.
+2. Relire soi-même le diff avec la définition de terminé du backlog : aucune
+   nouvelle règle de seuil, aucun état métier ajouté, aucune ressource
+   distante, mention « Simulation — données fictives, non opérationnelles »
+   conservée.
+3. Lancer `./mvnw verify` depuis `backend/`, démarrer l’application et
+   parcourir le tableau de bord au clavier, avec la réduction des animations
+   activée.
+4. Optionnel : demander une note de passation (décisions, fait, reste à faire)
+   pour reprendre dans une nouvelle session.
+
+**À montrer :** l’agent aide à vérifier, le développeur décide. C’est aussi
+l’occasion de reprendre les angles de la slide « Mettre en production » :
+accessibilité, qualité, cohérence.
+
+---
+
+## Partie 5 · Concepts avancés
+
+### Démo 10 — Déléguer Orbit dans un worktree
+
+**Slides :** « Les worktrees Git » et « La délégation asynchrone »
+
+1. Créer un worktree depuis la branche de départ, sans Orbit :
+   `git worktree add ../astro-mate-orbit -b demo/orbit-delegue`.
+2. Y lancer une session Copilot et lui confier toute la feature en une
+   demande : « Implémente la feature Orbit de docs/backlog.md, tickets 1 à 3,
+   en respectant les critères d’acceptation et la définition de terminé. »
+   La laisser tourner en arrière-plan, ou la confier à l’agent cloud avec
+   `/delegate`.
+3. Pendant ce temps, continuer à travailler dans le dossier principal.
+4. Comparer ensuite le résultat délégué avec la version guidée des démos 6 à 9.
+
+**À montrer :** chaque agent travaille dans son dossier, sans conflit. La
+délégation n’est fiable que si la tâche est bien spécifiée et le résultat
+vérifiable. Avec `/delegate`, l’agent cloud ouvre une pull request : la fermer
+après la démo.
+
+### Démo 11 — Évaluer un skill
+
+**Slide :** « Les evals »
+
+1. Ouvrir deux sessions neuves sur deux branches de travail : l’une avec le
+   skill `enquete-regression`, l’autre où le dossier du skill est retiré.
+2. Envoyer exactement la même demande que dans la démo 3.
+3. Comparer les deux réponses sur des critères fixés à l’avance : commit
+   correct, preuves tirées du diff, faits séparés des hypothèses, nombre
+   d’étapes.
+
+**À montrer :** on mesure l’effet d’un skill sur un cas reproductible au lieu
+de le juger à l’impression.
+
+---
+
+## Conclusion
+
+Revenir sur le fil complet : un contexte maîtrisé, des assets qui guident et
+protègent l’agent, une évolution menée étape par étape, puis la même évolution
+déléguée et une mesure objective. Terminer sur le message de la présentation :
+l’IA accélère, le développeur reste responsable.

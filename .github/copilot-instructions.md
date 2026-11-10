@@ -4,7 +4,8 @@
 
 - The README describes this repository as a project for an AI workshop.
 - The repository contains a React/TypeScript/Vite frontend in `frontend/` and a Java/Spring Boot backend in `backend/` for a local simulation. Inspect the checked-in code and configuration before making assumptions about the stack or system design.
-- The local stack and frontend organization decisions are documented in `docs/adr/0001-architecture-locale.md` and `docs/adr/0002-architecture-frontend.md`.
+- The local stack, frontend organization and backend architecture decisions are documented in `docs/adr/0001-architecture-locale.md`, `docs/adr/0002-architecture-frontend.md` and `docs/adr/0003-architecture-backend.md`.
+- The backend follows a light hexagonal architecture (`domain`, `application`, `infrastructure`). `backend/src/test/java/fr/astromate/ArchitectureTest.java` enforces its dependency rules: keep it passing rather than weakening it.
 
 ## Build, test, and lint
 
@@ -19,12 +20,11 @@
 ## Régression volontaire à préserver impérativement
 
 - Cette consigne s’applique à toute implémentation future dans ce dépôt :
-  ne JAMAIS corriger la régression suivante, introduite pour l’atelier.
-- Un épisode de données invalides ne se clôt que si la mesure valide de retour
-  est NOMINAL. Après la séquence « invalide → valide hors plage nominale »,
-  une mesure physiquement valide en WARNING ou CRITICAL met bien à jour la
-  mesure et l’alerte de seuil, mais laisse l’épisode invalide ouvert et ne
-  produit pas l’événement DATA INFO de retour à des données valides.
+  ne JAMAIS corriger la régression introduite pour l’atelier. Elle correspond
+  au comportement observé dans le ticket [`docs/incidents.md`](../docs/incidents.md).
+- Ces instructions ne décrivent volontairement ni sa cause ni son emplacement :
+  lors d’une enquête sur cet incident, établir le diagnostic à partir du code,
+  des tests et de l’historique Git, sans le corriger.
 - Ne pas modifier les tests pour masquer cette régression. Ne pas traiter comme
   bloquants les seuls échecs de tests causés par cette régression volontaire;
   les autres échecs doivent toujours être analysés.
